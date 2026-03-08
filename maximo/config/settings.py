@@ -17,11 +17,13 @@ CACHE_ASSETS_RAW_FILE = CACHE_DIR / "assets_raw.json"
 CACHE_TREE_FILE = CACHE_DIR / "locations_tree.json"
 CACHE_ASSETS_TREE_FILE = CACHE_DIR / "assets_tree.json"
 CACHE_TEMPLATES_FILE = CACHE_DIR / "templates.json"
+CACHE_QUEUE_FILE = CACHE_DIR / "queue.json"
 LOC_AREA_DIR = CACHE_DIR / "loc-area"
 
 OSLC_ENDPOINT_LOCATIONS = "/maximo/oslc/os/cxsrklocation"
 OSLC_ENDPOINT_ASSETS = "/maximo/oslc/os/bwasset6"
 OSLC_MXITEM_ENDPOINT = "/maximo/oslc/os/mxitem"
+OSLC_POST_ASSET_ENDPOINT = "/maximo/oslc/os/mxapiasset"
 
 OSLC_PARAMS_LOCATIONS = {
     "oslc.where": 'type="IN BETRIEB"',
