@@ -108,6 +108,120 @@ def _load_templates() -> list[dict]:
     return templates
 
 
+def _normalize_location_option(
+    location: Any,
+    description: Any,
+    siteid: Any,
+    parent: Any = None,
+) -> dict[str, str] | None:
+    cleaned_location = _clean_text(location)
+    if not cleaned_location:
+        return None
+
+    return {
+        "location": cleaned_location,
+        "description": _clean_text(description),
+        "siteid": _clean_text(siteid),
+        "parent": _clean_text(parent),
+    }
+
+
+def _collect_locations_from_tree(
+    nodes: Any,
+    collected: dict[str, dict[str, str]],
+):
+    if not isinstance(nodes, dict):
+        return
+
+    for node_id, node in nodes.items():
+        if not isinstance(node, dict):
+            continue
+
+        option = _normalize_location_option(
+            node.get("location") or node_id,
+            node.get("description"),
+            node.get("siteid"),
+            node.get("parent"),
+        )
+        if option:
+            collected[option["location"]] = option
+
+        children = node.get("children")
+        if isinstance(children, dict):
+            _collect_locations_from_tree(children, collected)
+
+
+def _load_locations() -> list[dict[str, str]]:
+    collected: dict[str, dict[str, str]] = {}
+
+    if settings.CACHE_TREE_FILE.exists():
+        try:
+            tree_data = json.loads(settings.CACHE_TREE_FILE.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"locations_tree.json ist ungueltig: {exc}",
+            ) from exc
+
+        if not isinstance(tree_data, dict):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="locations_tree.json muss ein JSON-Objekt enthalten",
+            )
+
+        _collect_locations_from_tree(tree_data, collected)
+
+    if not collected and settings.CACHE_RAW_FILE.exists():
+        try:
+            raw_data = json.loads(settings.CACHE_RAW_FILE.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"locations_raw.json ist ungueltig: {exc}",
+            ) from exc
+
+        if not isinstance(raw_data, list):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="locations_raw.json muss ein JSON-Array enthalten",
+            )
+
+        for raw_entry in raw_data:
+            if not isinstance(raw_entry, dict):
+                continue
+
+            lochierarchy = raw_entry.get("lochierarchy") or raw_entry.get("spi:lochierarchy")
+            parent = ""
+            if isinstance(lochierarchy, dict):
+                parent = lochierarchy.get("parent")
+
+            option = _normalize_location_option(
+                raw_entry.get("spi:location") or raw_entry.get("location"),
+                raw_entry.get("spi:description") or raw_entry.get("description"),
+                raw_entry.get("spi:siteid") or raw_entry.get("siteid"),
+                parent,
+            )
+            if option:
+                collected[option["location"]] = option
+
+    if not collected:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "Keine Location-Datei gefunden. Bitte zuerst "
+                "`python -m maximo.main` ausfuehren."
+            ),
+        )
+
+    return sorted(
+        collected.values(),
+        key=lambda option: (
+            option["location"].lower(),
+            option["description"].lower(),
+        ),
+    )
+
+
 def _load_queue_or_http_error() -> list[dict]:
     try:
         return load_queue()
@@ -155,6 +269,11 @@ def index():
 @app.get("/api/templates")
 def get_templates():
     return JSONResponse(_load_templates())
+
+
+@app.get("/api/locations")
+def get_locations():
+    return JSONResponse(_load_locations())
 
 
 @app.post("/api/queue", status_code=status.HTTP_201_CREATED)
@@ -214,7 +333,8 @@ def upload_queue(request: Request):
     changed = False
 
     for entry in queue:
-        if entry.get("status") != "pending":
+        current_status = entry.get("status") or "pending"
+        if current_status == "success":
             continue
 
         result = post_asset(

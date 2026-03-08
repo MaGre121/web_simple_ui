@@ -488,6 +488,7 @@
                 placeholder="Beschreibung oder Itemnummer eingeben"
               >
               <datalist id="templateOptions"></datalist>
+              <datalist id="locationOptions"></datalist>
               <div class="field-hint">Anzeigeformat: Beschreibung (ITEMNUM)</div>
             </div>
           </div>
@@ -519,7 +520,7 @@
             <div>
               <h2 class="panel-title">Queue</h2>
               <p class="panel-subtitle">
-                Pending-Eintraege koennen geloescht oder gesammelt nach Maximo hochgeladen werden.
+                Pending- und Error-Eintraege koennen geloescht oder erneut nach Maximo hochgeladen werden.
               </p>
             </div>
             <button id="uploadButton" class="primary-button" type="button">Alle einbuchen</button>
@@ -554,14 +555,17 @@
   <script>
     const state = {
       templates: [],
+      locations: [],
       queue: [],
       selectedTemplate: null,
+      selectedLocation: null,
       busy: false,
     };
 
     const messageEl = document.getElementById("message");
     const templateInput = document.getElementById("templateSearch");
     const templateOptions = document.getElementById("templateOptions");
+    const locationOptions = document.getElementById("locationOptions");
     const templateMeta = document.getElementById("templateMeta");
     const dynamicFields = document.getElementById("dynamicFields");
     const assetForm = document.getElementById("assetForm");
@@ -598,6 +602,15 @@
       return `${description} (${template.itemnum || "?"})`;
     }
 
+    function buildLocationLabel(location) {
+      if (!location) {
+        return "";
+      }
+
+      const description = location.description || "Ohne Beschreibung";
+      return `${description} (${location.location || "?"})`;
+    }
+
     function findTemplate(value) {
       const normalized = normalizeText(value);
       if (!normalized) {
@@ -608,6 +621,21 @@
         return (
           normalizeText(buildTemplateLabel(template)) === normalized ||
           normalizeText(template.itemnum) === normalized
+        );
+      }) || null;
+    }
+
+    function findLocation(value) {
+      const normalized = normalizeText(value);
+      if (!normalized) {
+        return null;
+      }
+
+      return state.locations.find((location) => {
+        return (
+          normalizeText(buildLocationLabel(location)) === normalized ||
+          normalizeText(location.location) === normalized ||
+          normalizeText(location.description) === normalized
         );
       }) || null;
     }
@@ -684,6 +712,86 @@
       return wrapper;
     }
 
+    function getLocationInput() {
+      return assetForm.elements.location || null;
+    }
+
+    function syncLocationInput() {
+      const locationInput = getLocationInput();
+      if (!locationInput) {
+        return;
+      }
+
+      locationInput.value = state.selectedLocation
+        ? buildLocationLabel(state.selectedLocation)
+        : "";
+    }
+
+    function selectLocation(location) {
+      if (!location) {
+        return;
+      }
+
+      state.selectedLocation = location;
+      syncLocationInput();
+    }
+
+    function focusPrimaryField() {
+      const locationInput = getLocationInput();
+      if (locationInput && !state.selectedLocation) {
+        locationInput.focus();
+        locationInput.select();
+        return;
+      }
+
+      const serialInput = assetForm.elements.serialnum || null;
+      if (serialInput) {
+        serialInput.focus();
+        serialInput.select();
+        return;
+      }
+
+      const firstInput = dynamicFields.querySelector("input");
+      if (firstInput) {
+        firstInput.focus();
+        firstInput.select();
+      }
+    }
+
+    function createLocationField() {
+      const wrapper = createField("location", "Location");
+      const input = wrapper.querySelector("input");
+      input.setAttribute("list", "locationOptions");
+      input.placeholder = "Beschreibung oder Location-Code eingeben";
+
+      const hint = document.createElement("div");
+      hint.className = "field-hint";
+      hint.textContent = "Exakter Treffer per Beschreibung oder Location-Code.";
+
+      input.addEventListener("input", handleLocationInput);
+      input.addEventListener("change", handleLocationInput);
+      input.addEventListener("blur", handleLocationInput);
+
+      wrapper.append(hint);
+      return wrapper;
+    }
+
+    function resolveUserFields(template) {
+      const userFields = Array.isArray(template.user_fields) && template.user_fields.length
+        ? [...template.user_fields]
+        : ["serialnum", "location"];
+
+      if (!userFields.includes("serialnum")) {
+        userFields.unshift("serialnum");
+      }
+
+      if (!userFields.includes("location")) {
+        userFields.push("location");
+      }
+
+      return userFields;
+    }
+
     function renderDynamicFields(template) {
       dynamicFields.innerHTML = "";
 
@@ -695,16 +803,17 @@
         return;
       }
 
-      const userFields = Array.isArray(template.user_fields) && template.user_fields.length
-        ? template.user_fields
-        : ["serialnum", "location"];
+      const userFields = resolveUserFields(template);
 
       userFields.forEach((fieldName) => {
+        if (fieldName === "location") {
+          dynamicFields.append(createLocationField());
+          return;
+        }
+
         const label = fieldName === "serialnum"
           ? "Serialnummer"
-          : fieldName === "location"
-            ? "Location"
-            : fieldName;
+          : fieldName;
         dynamicFields.append(createField(fieldName, label));
       });
 
@@ -713,28 +822,44 @@
           dynamicFields.append(createField(`spec__${specName}`, specName));
         });
       }
+
+      syncLocationInput();
     }
 
     function activateTemplate(template) {
-      state.selectedTemplate = template;
-      renderTemplateMeta(template);
-      renderDynamicFields(template);
+      if (!template) {
+        return;
+      }
 
-      if (template) {
-        const firstInput = dynamicFields.querySelector("input");
-        if (firstInput) {
-          firstInput.focus();
-        }
+      const isSameTemplate = state.selectedTemplate && state.selectedTemplate.itemnum === template.itemnum;
+
+      state.selectedTemplate = template;
+      templateInput.value = buildTemplateLabel(template);
+      renderTemplateMeta(template);
+
+      if (!isSameTemplate) {
+        renderDynamicFields(template);
+      }
+
+      if (!isSameTemplate || !dynamicFields.contains(document.activeElement)) {
+        focusPrimaryField();
       }
     }
 
     function resetForm() {
       assetForm.reset();
-      state.selectedTemplate = null;
-      renderTemplateMeta(null);
-      renderDynamicFields(null);
-      templateInput.value = "";
-      templateInput.focus();
+
+      if (!state.selectedTemplate) {
+        renderTemplateMeta(null);
+        renderDynamicFields(null);
+        templateInput.value = "";
+        templateInput.focus();
+        return;
+      }
+
+      templateInput.value = buildTemplateLabel(state.selectedTemplate);
+      syncLocationInput();
+      focusPrimaryField();
     }
 
     function collectEntry() {
@@ -742,8 +867,12 @@
         throw new Error("Bitte zuerst ein gueltiges Template auswaehlen.");
       }
 
+      if (!state.selectedLocation) {
+        throw new Error("Bitte zuerst eine gueltige Location auswaehlen.");
+      }
+
       const serialnum = assetForm.elements.serialnum ? assetForm.elements.serialnum.value.trim() : "";
-      const location = assetForm.elements.location ? assetForm.elements.location.value.trim() : "";
+      const location = state.selectedLocation.location || "";
 
       if (!serialnum || !location) {
         throw new Error("Serialnummer und Location sind Pflichtfelder.");
@@ -767,7 +896,7 @@
       return {
         itemnum: state.selectedTemplate.itemnum,
         description: state.selectedTemplate.description || "",
-        siteid: state.selectedTemplate.siteid || "",
+        siteid: state.selectedTemplate.siteid || state.selectedLocation.siteid || "",
         orgid: state.selectedTemplate.orgid || "",
         classstructureid: state.selectedTemplate.classstructureid || "",
         location,
@@ -805,6 +934,7 @@
       const pending = state.queue.filter((entry) => entry.status === "pending").length;
       const success = state.queue.filter((entry) => entry.status === "success").length;
       const error = state.queue.filter((entry) => entry.status === "error").length;
+      const retryable = pending + error;
 
       queueSummary.innerHTML = "";
       queueSummary.append(
@@ -814,7 +944,7 @@
         createSummaryChip("Error", error, "status-error")
       );
 
-      uploadButton.disabled = state.busy || pending === 0;
+      uploadButton.disabled = state.busy || retryable === 0;
     }
 
     function renderQueue() {
@@ -903,6 +1033,22 @@
       });
     }
 
+    async function loadLocations() {
+      const response = await fetch("/api/locations");
+      if (!response.ok) {
+        throw new Error(await parseError(response));
+      }
+
+      state.locations = await response.json();
+      locationOptions.innerHTML = "";
+
+      state.locations.forEach((location) => {
+        const option = document.createElement("option");
+        option.value = buildLocationLabel(location);
+        locationOptions.append(option);
+      });
+    }
+
     async function loadQueue() {
       const response = await fetch("/api/queue");
       if (!response.ok) {
@@ -982,7 +1128,7 @@
         renderQueue();
 
         const resultCount = Array.isArray(data.results) ? data.results.length : 0;
-        showMessage(`${resultCount} Pending-Eintraege wurden verarbeitet.`, "success");
+        showMessage(`${resultCount} Eintraege wurden verarbeitet.`, "success");
       } catch (error) {
         showMessage(error.message || String(error), "error");
       } finally {
@@ -994,10 +1140,8 @@
     function handleTemplateInput() {
       const template = findTemplate(templateInput.value);
       if (!template) {
-        if (state.selectedTemplate) {
-          state.selectedTemplate = null;
-          renderTemplateMeta(null);
-          renderDynamicFields(null);
+        if (state.selectedTemplate && document.activeElement !== templateInput) {
+          templateInput.value = buildTemplateLabel(state.selectedTemplate);
         }
         return;
       }
@@ -1005,10 +1149,28 @@
       activateTemplate(template);
     }
 
+    function handleLocationInput() {
+      const locationInput = getLocationInput();
+      if (!locationInput) {
+        return;
+      }
+
+      const location = findLocation(locationInput.value);
+      if (!location) {
+        if (state.selectedLocation && document.activeElement !== locationInput) {
+          syncLocationInput();
+        }
+        return;
+      }
+
+      selectLocation(location);
+    }
+
     async function init() {
       try {
         setBusy(true);
         await loadTemplates();
+        await loadLocations();
         await loadQueue();
         showMessage("Templates geladen. Erfassung ist bereit.", "info");
       } catch (error) {
@@ -1025,6 +1187,7 @@
     assetForm.addEventListener("submit", addQueueEntry);
     clearButton.addEventListener("click", resetForm);
     uploadButton.addEventListener("click", uploadQueue);
+    templateInput.addEventListener("blur", handleTemplateInput);
 
     init();
   </script>

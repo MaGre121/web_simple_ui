@@ -23,7 +23,7 @@ LOC_AREA_DIR = CACHE_DIR / "loc-area"
 OSLC_ENDPOINT_LOCATIONS = "/maximo/oslc/os/cxsrklocation"
 OSLC_ENDPOINT_ASSETS = "/maximo/oslc/os/bwasset6"
 OSLC_MXITEM_ENDPOINT = "/maximo/oslc/os/mxitem"
-OSLC_POST_ASSET_ENDPOINT = "/maximo/oslc/os/mxapiasset"
+OSLC_POST_ASSET_ENDPOINT = OSLC_ENDPOINT_ASSETS
 
 OSLC_PARAMS_LOCATIONS = {
     "oslc.where": 'type="IN BETRIEB"',
