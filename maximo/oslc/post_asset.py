@@ -1,10 +1,34 @@
 import logging
+import re
 
 import requests
 
 from maximo.config.settings import OSLC_POST_ASSET_ENDPOINT
 
 logger = logging.getLogger(__name__)
+MAC_SPEC_IDS = {"BAM.MACADRESSE"}
+
+
+def _is_mac_spec(attrid: str) -> bool:
+    return str(attrid or "").strip().upper() in MAC_SPEC_IDS
+
+
+def _normalize_mac_address(value: str, attrid: str) -> str:
+    cleaned_value = str(value or "").strip()
+    if not cleaned_value:
+        return ""
+
+    compact_value = re.sub(r"[\s.:-]+", "", cleaned_value)
+    if not re.fullmatch(r"[0-9A-Fa-f]{12}", compact_value):
+        raise ValueError(
+            f"Ungueltige MAC-Adresse fuer {attrid}: erwartet NN:NN:NN:NN:NN:NN"
+        )
+
+    compact_value = compact_value.upper()
+    return ":".join(
+        compact_value[index:index + 2]
+        for index in range(0, len(compact_value), 2)
+    )
 
 
 def _build_assetspec(entry: dict) -> list[dict]:
@@ -16,6 +40,8 @@ def _build_assetspec(entry: dict) -> list[dict]:
     for attrid, value in merged_specs.items():
         if value in (None, ""):
             continue
+        if _is_mac_spec(attrid):
+            value = _normalize_mac_address(value, attrid)
 
         assetspec.append(
             {
@@ -99,7 +125,16 @@ def _extract_error(response: requests.Response) -> str:
 
 
 def post_asset(server: str, session, entry: dict) -> dict:
-    payload = _build_payload(entry)
+    try:
+        payload = _build_payload(entry)
+    except ValueError as exc:
+        logger.error(
+            "Asset POST abgebrochen fuer item=%s error=%s",
+            entry.get("itemnum"),
+            exc,
+        )
+        return {"success": False, "error": str(exc)}
+
     url = f"{server}{OSLC_POST_ASSET_ENDPOINT}"
 
     try:

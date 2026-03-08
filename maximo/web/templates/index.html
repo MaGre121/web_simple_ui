@@ -553,6 +553,8 @@
   </main>
 
   <script>
+    const MAC_SPEC_IDS = new Set(["bam.macadresse"]);
+
     const state = {
       templates: [],
       locations: [],
@@ -577,6 +579,36 @@
 
     function normalizeText(value) {
       return String(value || "").trim().toLowerCase();
+    }
+
+    function isMacSpec(specName) {
+      return MAC_SPEC_IDS.has(normalizeText(specName));
+    }
+
+    function normalizeMacAddress(value) {
+      const cleanedValue = String(value || "").trim();
+      if (!cleanedValue) {
+        return "";
+      }
+
+      const compactValue = cleanedValue.replace(/[\s.:-]+/g, "");
+      if (!/^[0-9A-Fa-f]{12}$/.test(compactValue)) {
+        throw new Error("Ungueltige MAC-Adresse: erwartet NN:NN:NN:NN:NN:NN.");
+      }
+
+      return compactValue
+        .toUpperCase()
+        .match(/.{2}/g)
+        .join(":");
+    }
+
+    function normalizeSpecValue(specName, value) {
+      const cleanedValue = String(value || "").trim();
+      if (isMacSpec(specName)) {
+        return normalizeMacAddress(cleanedValue);
+      }
+
+      return cleanedValue;
     }
 
     function showMessage(text, type) {
@@ -776,6 +808,47 @@
       return wrapper;
     }
 
+    function createSpecField(specName) {
+      const wrapper = createField(`spec__${specName}`, specName);
+      const input = wrapper.querySelector("input");
+
+      if (!isMacSpec(specName)) {
+        return wrapper;
+      }
+
+      input.placeholder = "0011.2233.4455 oder 00:11:22:33:44:55";
+
+      const hint = document.createElement("div");
+      hint.className = "field-hint";
+      hint.textContent = "Scanner-Formate werden automatisch nach NN:NN:NN:NN:NN:NN konvertiert.";
+
+      const normalizeFieldValue = (shouldReport) => {
+        if (!input.value.trim()) {
+          input.setCustomValidity("");
+          return;
+        }
+
+        try {
+          input.value = normalizeMacAddress(input.value);
+          input.setCustomValidity("");
+        } catch (error) {
+          input.setCustomValidity(error.message || String(error));
+          if (shouldReport) {
+            input.reportValidity();
+          }
+        }
+      };
+
+      input.addEventListener("input", () => {
+        input.setCustomValidity("");
+      });
+      input.addEventListener("change", () => normalizeFieldValue(true));
+      input.addEventListener("blur", () => normalizeFieldValue(false));
+
+      wrapper.append(hint);
+      return wrapper;
+    }
+
     function resolveUserFields(template) {
       const userFields = Array.isArray(template.user_fields) && template.user_fields.length
         ? [...template.user_fields]
@@ -819,7 +892,7 @@
 
       if (Array.isArray(template.user_specs) && template.user_specs.length) {
         template.user_specs.forEach((specName) => {
-          dynamicFields.append(createField(`spec__${specName}`, specName));
+          dynamicFields.append(createSpecField(specName));
         });
       }
 
@@ -886,9 +959,20 @@
       for (const specName of specNames) {
         const fieldName = `spec__${specName}`;
         const element = assetForm.elements[fieldName];
-        const value = element ? element.value.trim() : "";
+        let value = "";
+
+        try {
+          value = normalizeSpecValue(specName, element ? element.value : "");
+        } catch (error) {
+          throw new Error(`${specName}: ${error.message || String(error)}`);
+        }
+
         if (!value) {
           throw new Error(`Pflichtwert fehlt fuer ${specName}.`);
+        }
+        if (element) {
+          element.value = value;
+          element.setCustomValidity("");
         }
         userSpecs[specName] = value;
       }

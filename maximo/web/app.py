@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -15,12 +16,39 @@ from maximo.oslc.session import create_session, load_environment
 logger = logging.getLogger(__name__)
 
 INDEX_FILE = Path(__file__).resolve().parent / "templates" / "index.html"
+MAC_SPEC_IDS = {"BAM.MACADRESSE"}
 
 
 def _clean_text(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def _is_mac_spec(spec_name: str) -> bool:
+    return _clean_text(spec_name).upper() in MAC_SPEC_IDS
+
+
+def _normalize_mac_address(value: Any, field_label: str) -> str:
+    cleaned_value = _clean_text(value)
+    if not cleaned_value:
+        return ""
+
+    compact_value = re.sub(r"[\s.:-]+", "", cleaned_value)
+    if not re.fullmatch(r"[0-9A-Fa-f]{12}", compact_value):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Ungueltige MAC-Adresse fuer {field_label}: "
+                "erwartet NN:NN:NN:NN:NN:NN"
+            ),
+        )
+
+    compact_value = compact_value.upper()
+    return ":".join(
+        compact_value[index:index + 2]
+        for index in range(0, len(compact_value), 2)
+    )
 
 
 def _normalize_specs(specs: Any, field_name: str) -> dict[str, str]:
@@ -37,7 +65,10 @@ def _normalize_specs(specs: Any, field_name: str) -> dict[str, str]:
         cleaned_key = _clean_text(key)
         if not cleaned_key:
             continue
-        normalized[cleaned_key] = _clean_text(value)
+        cleaned_value = _clean_text(value)
+        if _is_mac_spec(cleaned_key):
+            cleaned_value = _normalize_mac_address(cleaned_value, cleaned_key)
+        normalized[cleaned_key] = cleaned_value
 
     return normalized
 
