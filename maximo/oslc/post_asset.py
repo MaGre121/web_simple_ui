@@ -1,5 +1,6 @@
 import logging
 import re
+from typing import Any
 
 import requests
 
@@ -9,12 +10,26 @@ logger = logging.getLogger(__name__)
 MAC_SPEC_IDS = {"BAM.MACADRESSE"}
 
 
+def _clean_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _pick_text(data: dict, *keys: str) -> str:
+    for key in keys:
+        value = _clean_text(data.get(key))
+        if value:
+            return value
+    return ""
+
+
 def _is_mac_spec(attrid: str) -> bool:
-    return str(attrid or "").strip().upper() in MAC_SPEC_IDS
+    return _clean_text(attrid).upper() in MAC_SPEC_IDS
 
 
 def _normalize_mac_address(value: str, attrid: str) -> str:
-    cleaned_value = str(value or "").strip()
+    cleaned_value = _clean_text(value)
     if not cleaned_value:
         return ""
 
@@ -33,41 +48,119 @@ def _normalize_mac_address(value: str, attrid: str) -> str:
 
 def _build_assetspec(entry: dict) -> list[dict]:
     merged_specs = {}
-    merged_specs.update(entry.get("fixed_specs") or {})
-    merged_specs.update(entry.get("user_specs") or {})
+    fixed_specs = entry.get("fixed_specs")
+    user_specs = entry.get("user_specs")
+    if isinstance(fixed_specs, dict):
+        merged_specs.update(fixed_specs)
+    if isinstance(user_specs, dict):
+        merged_specs.update(user_specs)
 
     assetspec = []
+    classstructureid = _pick_text(entry, "classstructureid")
     for attrid, value in merged_specs.items():
         if value in (None, ""):
             continue
         if _is_mac_spec(attrid):
             value = _normalize_mac_address(value, attrid)
 
-        assetspec.append(
-            {
-                "spi:assetattrid": attrid,
-                "spi:alnvalue": value,
-            }
-        )
+        spec_entry = {
+            "spi:assetattrid": _clean_text(attrid),
+            "spi:alnvalue": value,
+        }
+        if classstructureid:
+            spec_entry["spi:classstructureid"] = classstructureid
+
+        assetspec.append(spec_entry)
 
     return assetspec
 
 
+def _build_assetusercust(entry: dict) -> list[dict]:
+    users = entry.get("users")
+    if not isinstance(users, list):
+        users = entry.get("user_secs")
+    if not isinstance(users, list):
+        return []
+
+    assetusercust = []
+    for user in users:
+        if not isinstance(user, dict):
+            continue
+
+        personid = _pick_text(user, "personid", "spi:personid")
+        if not personid:
+            continue
+
+        assetusercust.append(
+            {
+                "spi:personid": personid,
+                "spi:isuser": bool(user.get("isuser", False)),
+                "spi:iscustodian": bool(user.get("iscustodian", False)),
+                "spi:isprimary": bool(user.get("isprimary", False)),
+            }
+        )
+
+    return assetusercust
+
+
 def _build_payload(entry: dict) -> dict:
-    payload = {
-        "spi:itemnum": entry["itemnum"],
-        "spi:siteid": entry["siteid"],
-        "spi:orgid": entry["orgid"],
-        "spi:location": entry["location"],
-        "spi:serialnum": entry["serialnum"],
+    payload = {}
+
+    required_fields = {
+        "spi:itemnum": _pick_text(entry, "itemnum"),
+        "spi:siteid": _pick_text(entry, "siteid"),
+        "spi:orgid": _pick_text(entry, "orgid"),
+        "spi:location": _pick_text(entry, "location"),
+        "spi:serialnum": _pick_text(entry, "serialnum"),
     }
 
-    if entry.get("classstructureid"):
-        payload["spi:classstructureid"] = entry["classstructureid"]
+    missing_fields = [
+        key.removeprefix("spi:")
+        for key, value in required_fields.items()
+        if not value
+    ]
+    if missing_fields:
+        raise ValueError(
+            "Pflichtfelder fehlen fuer Maximo-POST: "
+            + ", ".join(missing_fields)
+        )
+
+    payload.update(required_fields)
+
+    itemsetid = _pick_text(entry, "itemsetid")
+    if itemsetid:
+        payload["spi:itemsetid"] = itemsetid
+
+    classstructureid = _pick_text(entry, "classstructureid")
+    if classstructureid:
+        payload["spi:classstructureid"] = classstructureid
+
+    persongroup = _pick_text(
+        entry,
+        "group",
+        "cxpersongroup",
+        "persongroup",
+    )
+    if persongroup:
+        payload["spi:cxpersongroup"] = persongroup
+
+    project = _pick_text(
+        entry,
+        "cxprojekt",
+        "projekt",
+        "projektcode",
+        "cxprojektid",
+    )
+    if project:
+        payload["spi:cxprojekt"] = project
 
     assetspec = _build_assetspec(entry)
     if assetspec:
         payload["spi:assetspec"] = assetspec
+
+    assetusercust = _build_assetusercust(entry)
+    if assetusercust:
+        payload["spi:assetusercust"] = assetusercust
 
     return payload
 
@@ -86,7 +179,8 @@ def _extract_assetnum_from_headers(response: requests.Response) -> str:
     if not location:
         return ""
 
-    return location.rstrip("/").split("/")[-1]
+    assetnum = location.rstrip("/").split("/")[-1]
+    return assetnum.split("?", 1)[0]
 
 
 def _extract_error(response: requests.Response) -> str:

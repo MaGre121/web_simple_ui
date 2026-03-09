@@ -55,5 +55,5 @@ OSLC_MXPROJECT_PARAMS = {
 OSLC_USERS_PARAMS = {
     "oslc.where": 'spi:status="AKTIV"',
     "oslc.select": "personid",
-    "oslc.pageSize": 200
+    "oslc.pageSize": 1000
 }

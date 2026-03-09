@@ -59,6 +59,7 @@ Session (LtpaToken2) und Server wird aus webUI geladen – und an `session.py` �
 ```python
 # queue.json Eintrag
 {
+  "group": "ConfigLibarianGroup",
   "id": "uuid4",
   "itemnum": "CISCO.CATALYST.9200L",
   "description": "...",
@@ -69,6 +70,7 @@ Session (LtpaToken2) und Server wird aus webUI geladen – und an `session.py` �
   "serialnum": "SN-12345",
   "fixed_specs": { "BAM.TYPENBEZEICHNUNG": "Cisco Catalyst 9200L" },
   "user_specs": { "BAM.MACADRESSE": "F4:33:92:3A:79:80" },
+  "user_secs": [ {"personid" : "MAXMUSTERMANN"}, {"personid": "UWEUNANGENEHM"} ]
   "status": "pending"  # pending | success | error
 }
 ```
@@ -88,6 +90,7 @@ Baut den Maximo-Payload aus einem Queue-Eintrag und POSTet ihn.
 **Payload-Struktur:**
 ```json
 {
+  "spi:cxpersongroup": "...",
   "spi:itemnum": "...",
   "spi:siteid": "...",
   "spi:orgid": "...",
@@ -97,7 +100,12 @@ Baut den Maximo-Payload aus einem Queue-Eintrag und POSTet ihn.
   "spi:assetspec": [
     { "spi:assetattrid": "BAM.TYPENBEZEICHNUNG", "spi:alnvalue": "..." },
     { "spi:assetattrid": "BAM.MACADRESSE", "spi:alnvalue": "..." }
-  ]
+  ],
+  "spi:assetusercust": [
+    {"spi:personid": "...", "spi:isuser": boolean, "spi:iscustodian": boolean, "spi:isprimary": boolean },
+    {"spi:personid": "...", "spi:isuser": boolean, "spi:iscustodian": boolean, "spi:isprimary": boolean },
+  ],
+  "spi:cxprojekt": "..."
 }
 ```
 
@@ -118,16 +126,19 @@ Single-Page, kein Build-Step nötig.
 **UI-Elemente:**
 
 1. **Template-Dropdown** – durchsuchbar (type-ahead), zeigt `description (itemnum)`
+1a. **Projekte-Dropdown** – durchsuchbar (type-ahead), zeigt `description (projektcode)`
+1b. **Locations-Dropdown** – durchsuchbar (type-ahead), zeigt `description (location)`
+1c. **Nutzer-Dropdown** – durchsuchbar (type-ahead), zeigt `personid`
 2. **Dynamisches Formular** – generiert sich aus gewähltem Template:
-   - `user_fields`: `serialnum`, `location` → Standard-Inputs
-   - `user_specs`: je ein Input-Feld pro Spec-Attribut
+   - `user_fields`: `serialnum` → Standard-Inputs
+   - `user_specs`: je ein Input-Feld pro Spec-Attribut (Eingabe optional)
    - `fixed_specs`: werden NICHT angezeigt (nur im Payload)
 3. **„Zur Queue" Button** – validiert Pflichtfelder, POST an `/api/queue`
-4. **Queue-Tabelle** – zeigt alle pending Einträge, mit Delete-Button
+4. **Queue-Tabelle** – zeigt alle pending Einträge, mit Delete-Button (delete button kann betätigt werden und löscht den entsprechenden Eintrag)
 5. **„Alle einbuchen" Button** – POST an `/api/upload`, aktualisiert Status in Tabelle
 
 **UX-Details:**
-- Nach erfolgreichem Queue-Add: Formular reset, Fokus zurück auf Dropdown
+- Nach erfolgreichem Queue-Add: Formular reset, Fokus zurück auf serialnum
 - Barcode-Scanner funktioniert als Keyboard-Input (kein spezieller Handler nötig)
 - Status-Farben: pending=grau, success=grün, error=rot
 

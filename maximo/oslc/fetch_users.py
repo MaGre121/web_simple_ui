@@ -13,7 +13,7 @@ def fetch_users(server: str, session) -> list[dict]:
     from maximo.oslc.fetch import fetch_all_oslc
 
     logger.info("Fetching projects ...")
-    items = fetch_all_oslc(server, session, OSLC_ENDPOINT_USERS, OSLC_USERS_PARAMS, max_pages=50)
+    items = fetch_all_oslc(server, session, OSLC_ENDPOINT_USERS, OSLC_USERS_PARAMS, max_pages=100)
 
     users = [_parse_users(i) for i in items]
     logger.info("Fetched %d projects", len(users))
