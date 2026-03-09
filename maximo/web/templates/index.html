@@ -22,1258 +22,980 @@
       --mono: "Consolas", "Liberation Mono", monospace;
       --sans: "Trebuchet MS", "Segoe UI", sans-serif;
     }
-
-    * {
-      box-sizing: border-box;
-    }
-
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
       font-family: var(--sans);
       color: var(--ink);
       background:
-        radial-gradient(circle at top left, rgba(184, 92, 56, 0.18), transparent 28%),
-        radial-gradient(circle at bottom right, rgba(32, 104, 92, 0.18), transparent 32%),
+        radial-gradient(circle at top left, rgba(184,92,56,0.18), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(32,104,92,0.18), transparent 32%),
         linear-gradient(145deg, var(--bg), #f8f4ed 55%, var(--bg-strong));
     }
-
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(23, 32, 51, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(23, 32, 51, 0.03) 1px, transparent 1px);
-      background-size: 28px 28px;
-      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.32), transparent 85%);
-    }
-
-    main {
-      width: min(1320px, calc(100vw - 32px));
-      margin: 0 auto;
-      padding: 28px 0 36px;
-    }
-
-    .hero {
-      display: grid;
-      gap: 18px;
-      margin-bottom: 22px;
-    }
-
-    .hero-card {
-      display: grid;
-      gap: 14px;
-      padding: 28px;
-      border: 1px solid rgba(255, 255, 255, 0.75);
-      border-radius: calc(var(--radius) + 6px);
-      background:
-        linear-gradient(135deg, rgba(255, 250, 242, 0.94), rgba(245, 235, 223, 0.92)),
-        linear-gradient(135deg, rgba(184, 92, 56, 0.12), transparent 38%);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-      position: relative;
-    }
-
-    .hero-card::after {
-      content: "";
-      position: absolute;
-      top: -28px;
-      right: -18px;
-      width: 170px;
-      height: 170px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(184, 92, 56, 0.16), transparent 68%);
-    }
-
-    .eyebrow {
-      font-size: 12px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--accent-dark);
-    }
-
-    h1 {
-      margin: 0;
-      font-size: clamp(32px, 4vw, 54px);
-      line-height: 0.94;
-      max-width: 12ch;
-    }
-
-    .hero-copy {
-      max-width: 64ch;
-      line-height: 1.55;
-      color: var(--muted);
-      margin: 0;
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(320px, 460px) minmax(0, 1fr);
-      gap: 22px;
-      align-items: start;
-    }
-
-    .panel {
-      border-radius: var(--radius);
-      background: var(--panel);
-      border: 1px solid rgba(255, 255, 255, 0.9);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(14px);
-      overflow: hidden;
-    }
-
-    .panel-inner {
-      padding: 22px;
-      display: grid;
-      gap: 18px;
-    }
-
-    .panel-title-row {
+    h1 { font-size: 1.5rem; margin: 0; letter-spacing: 0.04em; }
+    header {
+      padding: 28px 40px 20px;
+      border-bottom: 1px solid var(--line);
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
+      background: var(--panel);
+      backdrop-filter: blur(8px);
     }
-
-    .panel-title {
-      margin: 0;
-      font-size: 22px;
-      letter-spacing: 0.01em;
+    .logo {
+      width: 38px; height: 38px;
+      background: var(--accent);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 700; font-size: 1rem; letter-spacing: 0.05em;
     }
-
-    .panel-subtitle {
-      margin: 0;
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 36px 24px;
+      display: grid;
+      gap: 28px;
+    }
+    article {
+      background: var(--panel);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--line);
+      overflow: hidden;
+    }
+    .section-header {
+      padding: 20px 28px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-icon {
+      width: 32px; height: 32px;
+      background: rgba(184,92,56,0.12);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+    }
+    .section-title { font-weight: 700; font-size: 1rem; }
+    .section-body { padding: 22px 28px 26px; display: grid; gap: 18px; }
+    .field { display: grid; gap: 6px; }
+    .field label {
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
       color: var(--muted);
-      font-size: 14px;
-      line-height: 1.5;
+      font-weight: 600;
     }
-
+    .field input, .field select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 14px;
+      font-family: var(--sans);
+      background: rgba(255,255,255,0.7);
+      color: var(--ink);
+      transition: border-color 0.15s;
+      outline: none;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--accent);
+      background: #fff;
+    }
+    .field-hint { font-size: 11px; color: var(--muted); margin-top: 2px; }
     .field-grid {
       display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 14px;
     }
-
-    .field {
+    .persistent-fields {
       display: grid;
-      gap: 8px;
+      gap: 14px;
+      padding: 18px;
+      border: 1px solid rgba(184,92,56,0.2);
+      border-radius: 14px;
+      background: rgba(184,92,56,0.04);
     }
-
-    .field label {
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.03em;
+    .persistent-label {
+      font-size: 11px;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .field input {
-      width: 100%;
-      padding: 14px 15px;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      background: rgba(255, 255, 255, 0.82);
-      color: var(--ink);
-      font: inherit;
-      transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
-    }
-
-    .field input:focus {
-      outline: none;
-      border-color: rgba(184, 92, 56, 0.5);
-      box-shadow: 0 0 0 4px rgba(184, 92, 56, 0.12);
-      transform: translateY(-1px);
-    }
-
-    .field-hint {
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .button-row {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    button {
-      border: 0;
-      border-radius: 999px;
-      padding: 13px 18px;
-      font: inherit;
+      color: var(--accent);
       font-weight: 700;
-      cursor: pointer;
-      transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+      margin-bottom: 2px;
     }
-
-    button:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 10px 24px rgba(23, 32, 51, 0.16);
-    }
-
-    button:disabled {
-      cursor: wait;
-      opacity: 0.55;
-    }
-
-    .primary-button {
-      background: linear-gradient(135deg, var(--accent), #c9784d);
-      color: #fff7f1;
-    }
-
-    .secondary-button {
-      background: rgba(23, 32, 51, 0.08);
-      color: var(--ink);
-    }
-
-    .message {
-      display: none;
-      padding: 14px 16px;
-      border-radius: 14px;
-      font-size: 14px;
-      line-height: 1.5;
-      border: 1px solid transparent;
-    }
-
-    .message[data-type="info"] {
-      display: block;
-      background: rgba(23, 32, 51, 0.06);
-      border-color: rgba(23, 32, 51, 0.08);
-    }
-
-    .message[data-type="success"] {
-      display: block;
-      background: rgba(40, 115, 76, 0.12);
-      border-color: rgba(40, 115, 76, 0.2);
-      color: #174b31;
-    }
-
-    .message[data-type="error"] {
-      display: block;
-      background: rgba(170, 60, 60, 0.12);
-      border-color: rgba(170, 60, 60, 0.22);
-      color: #7f2626;
-    }
-
     .template-meta {
       display: grid;
       gap: 10px;
       padding: 16px;
       border: 1px solid var(--line);
       border-radius: 16px;
-      background: rgba(255, 255, 255, 0.56);
-      min-height: 108px;
+      background: rgba(255,255,255,0.56);
+      min-height: 80px;
     }
-
-    .template-meta-empty {
-      color: var(--muted);
-      line-height: 1.5;
-      margin: 0;
-    }
-
+    .template-meta-empty { color: var(--muted); line-height: 1.5; margin: 0; font-size: 13px; }
     .meta-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0,1fr));
       gap: 10px 14px;
     }
-
-    .meta-item {
-      display: grid;
-      gap: 4px;
-    }
-
-    .meta-label {
-      font-size: 11px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .meta-value {
-      font-weight: 700;
-      word-break: break-word;
-    }
-
-    .meta-value.code {
-      font-family: var(--mono);
-      font-size: 13px;
-    }
-
-    .dynamic-fields {
-      display: grid;
-      gap: 14px;
-    }
-
+    .meta-item { display: grid; gap: 4px; }
+    .meta-label { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+    .meta-value { font-weight: 700; word-break: break-word; }
+    .meta-value.code { font-family: var(--mono); font-size: 13px; }
+    .dynamic-fields { display: grid; gap: 14px; }
     .placeholder-box {
-      padding: 18px;
-      border-radius: 16px;
-      border: 1px dashed rgba(23, 32, 51, 0.18);
+      padding: 16px;
+      border: 1px dashed var(--line);
+      border-radius: 12px;
       color: var(--muted);
-      line-height: 1.5;
-      background: rgba(255, 255, 255, 0.42);
+      font-size: 13px;
+      text-align: center;
     }
-
-    .queue-summary {
-      display: flex;
+    /* user list */
+    .user-add-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
       gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
+      align-items: end;
     }
-
-    .summary-chip,
+    .user-list { display: grid; gap: 10px; }
+    .user-entry {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.6);
+    }
+    .user-entry-info { display: grid; gap: 4px; }
+    .user-entry-name { font-weight: 700; font-size: 14px; }
+    .user-entry-roles { display: flex; gap: 12px; flex-wrap: wrap; }
+    .role-check {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .role-check input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
+    .primary-badge {
+      display: inline-block;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      background: rgba(184,92,56,0.15);
+      color: var(--accent-dark);
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-weight: 700;
+    }
+    /* buttons */
+    .primary-button {
+      padding: 11px 28px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .primary-button:hover:not(:disabled) { background: var(--accent-dark); }
+    .primary-button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .secondary-button {
+      padding: 11px 22px;
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .secondary-button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .secondary-button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .danger-button {
+      padding: 7px 14px;
+      background: transparent;
+      color: var(--error);
+      border: 1px solid rgba(170,60,60,0.25);
+      border-radius: 9px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .danger-button:hover:not(:disabled) { background: rgba(170,60,60,0.08); }
+    .danger-button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .small-button {
+      padding: 9px 16px;
+      background: rgba(23,32,51,0.07);
+      color: var(--ink);
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .small-button:hover { background: rgba(23,32,51,0.13); }
+    .button-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+    /* message */
+    .message {
+      display: none;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .message.visible { display: block; }
+    .message[data-type="info"] { background: rgba(23,32,51,0.06); border-color: rgba(23,32,51,0.08); }
+    .message[data-type="ok"] { background: rgba(40,115,76,0.12); border-color: rgba(40,115,76,0.2); color: #174b31; }
+    .message[data-type="error"] { background: rgba(170,60,60,0.12); border-color: rgba(170,60,60,0.22); color: #7f2626; }
+    /* queue table */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead tr { border-bottom: 2px solid var(--line); }
+    th { padding: 10px 12px; text-align: left; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    .cell-code { font-family: var(--mono); font-size: 12px; }
+    .cell-muted { color: var(--muted); font-size: 12px; }
     .status-chip {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      font-size: 13px;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
       font-weight: 700;
-      background: rgba(23, 32, 51, 0.08);
-      color: var(--ink);
-    }
-
-    .status-chip::before,
-    .summary-chip::before {
-      content: "";
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: currentColor;
-      opacity: 0.9;
-    }
-
-    .status-pending {
-      color: var(--pending);
-      background: rgba(109, 116, 127, 0.12);
-    }
-
-    .status-success {
-      color: var(--ok);
-      background: rgba(40, 115, 76, 0.12);
-    }
-
-    .status-error {
-      color: var(--error);
-      background: rgba(170, 60, 60, 0.12);
-    }
-
-    .queue-table-wrap {
-      overflow: auto;
-      border-radius: 18px;
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.62);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 720px;
-    }
-
-    thead th {
-      position: sticky;
-      top: 0;
-      z-index: 1;
-      text-align: left;
-      font-size: 12px;
-      letter-spacing: 0.13em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--muted);
-      background: rgba(243, 239, 231, 0.95);
-      backdrop-filter: blur(12px);
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--line);
     }
-
-    tbody td {
-      padding: 14px 16px;
-      border-bottom: 1px solid rgba(23, 32, 51, 0.08);
-      vertical-align: top;
-      line-height: 1.45;
-    }
-
-    tbody tr:last-child td {
-      border-bottom: 0;
-    }
-
-    .cell-code {
-      font-family: var(--mono);
-      font-size: 13px;
-    }
-
-    .cell-muted {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .danger-button {
-      background: rgba(170, 60, 60, 0.12);
-      color: #8a2d2d;
-      padding: 9px 14px;
-    }
-
-    .empty-row {
-      color: var(--muted);
-      text-align: center;
-      padding: 28px 16px;
-    }
-
-    @media (max-width: 1040px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 720px) {
-      main {
-        width: min(100vw - 20px, 1320px);
-        padding-top: 18px;
-      }
-
-      .hero-card,
-      .panel-inner {
-        padding: 18px;
-      }
-
-      .meta-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .button-row,
-      .panel-title-row {
-        align-items: stretch;
-        flex-direction: column;
-      }
-
-      button {
-        width: 100%;
-      }
-    }
+    .status-chip.pending { background: rgba(109,116,127,0.12); color: var(--pending); }
+    .status-chip.ok { background: rgba(40,115,76,0.12); color: var(--ok); }
+    .status-chip.error { background: rgba(170,60,60,0.12); color: var(--error); }
+    .queue-summary { font-size: 12px; color: var(--muted); padding: 10px 28px; border-top: 1px solid var(--line); }
+    .upload-row { padding: 16px 28px; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
   </style>
 </head>
 <body>
-  <main>
-    <section class="hero">
-      <div class="hero-card">
-        <div class="eyebrow">Local Office Workflow</div>
-        <h1>Maximo Asset Scan UI</h1>
-        <p class="hero-copy">
-          Templates waehlen, Asset-Daten erfassen, lokal in die Queue legen und gesammelt nach Maximo senden.
-        </p>
-        <div id="message" class="message" aria-live="polite"></div>
+
+<header>
+  <div class="logo">MX</div>
+  <h1>Maximo Asset Scan</h1>
+</header>
+
+<main>
+
+  <!-- FORM CARD -->
+  <article>
+    <div class="section-header">
+      <div class="section-icon">&#9998;</div>
+      <div class="section-title">Neues Asset erfassen</div>
+    </div>
+    <div class="section-body">
+
+      <div id="messageBox" class="message" data-type="info"></div>
+
+      <!-- PERSISTENT FIELDS -->
+      <div class="persistent-fields">
+        <div class="persistent-label">&#128204; Persistente Felder &ndash; bleiben nach dem Hinzufuegen erhalten</div>
+
+        <!-- Template -->
+        <div class="field-grid">
+          <div class="field">
+            <label for="templateSearch">Template</label>
+            <input id="templateSearch" type="text" list="templateOptions" autocomplete="off" spellcheck="false" placeholder="Beschreibung oder Itemnummer ...">
+            <datalist id="templateOptions"></datalist>
+            <div class="field-hint">Format: Beschreibung (ITEMNUM)</div>
+          </div>
+
+          <!-- Projekt -->
+          <div class="field">
+            <label for="projectSearch">Projekt</label>
+            <input id="projectSearch" type="text" list="projectOptions" autocomplete="off" spellcheck="false" placeholder="Beschreibung oder Projektcode ...">
+            <datalist id="projectOptions"></datalist>
+            <div class="field-hint">Format: Beschreibung (PROJEKTCODE)</div>
+          </div>
+        </div>
+
+        <!-- Location -->
+        <div class="field">
+          <label for="locationSearch">Location</label>
+          <input id="locationSearch" type="text" list="locationOptions" autocomplete="off" spellcheck="false" placeholder="Location suchen ...">
+          <datalist id="locationOptions"></datalist>
+        </div>
+
+        <!-- Users -->
+        <div class="field">
+          <label>Benutzer / Custodians</label>
+          <div class="user-add-row">
+            <input id="userSearch" type="text" list="userOptions" autocomplete="off" spellcheck="false" placeholder="Person suchen und hinzufuegen ...">
+            <datalist id="userOptions"></datalist>
+            <button type="button" id="addUserButton" class="small-button">+ Hinzufuegen</button>
+          </div>
+          <div id="userList" class="user-list" style="margin-top:8px;"></div>
+          <div class="field-hint">Mindestens ein Benutzer empfohlen. Genau einer darf &bdquo;Primary&ldquo; sein.</div>
+        </div>
+
       </div>
-    </section>
 
-    <section class="layout">
-      <article class="panel">
-        <div class="panel-inner">
-          <div>
-            <h2 class="panel-title">Erfassung</h2>
-            <p class="panel-subtitle">
-              Das Template-Feld akzeptiert Beschreibung oder Itemnummer. Bei einem exakten Treffer wird das Formular sofort aufgebaut.
-            </p>
-          </div>
+      <!-- TEMPLATE META -->
+      <div id="templateMeta" class="template-meta">
+        <p class="template-meta-empty">Noch kein Template aktiv. Nach Auswahl erscheinen die Felder hier.</p>
+      </div>
 
-          <div class="field-grid">
-            <div class="field">
-              <label for="templateSearch">Template</label>
-              <input
-                id="templateSearch"
-                type="text"
-                list="templateOptions"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder="Beschreibung oder Itemnummer eingeben"
-              >
-              <datalist id="templateOptions"></datalist>
-              <datalist id="locationOptions"></datalist>
-              <div class="field-hint">Anzeigeformat: Beschreibung (ITEMNUM)</div>
-            </div>
-          </div>
-
-          <div id="templateMeta" class="template-meta">
-            <p class="template-meta-empty">
-              Noch kein Template aktiv. Nach Auswahl erscheinen die benoetigten Eingabefelder hier.
-            </p>
-          </div>
-
-          <form id="assetForm">
-            <div id="dynamicFields" class="dynamic-fields">
-              <div class="placeholder-box">
-                Keine Felder aktiv. Zuerst ein Template auswaehlen.
-              </div>
-            </div>
-
-            <div class="button-row">
-              <button id="addButton" class="primary-button" type="submit">Zur Queue</button>
-              <button id="clearButton" class="secondary-button" type="button">Formular leeren</button>
-            </div>
-          </form>
+      <!-- DYNAMIC FIELDS + SUBMIT -->
+      <form id="assetForm">
+        <div id="dynamicFields" class="dynamic-fields">
+          <div class="placeholder-box">Keine Felder aktiv. Zuerst ein Template auswaehlen.</div>
         </div>
-      </article>
-
-      <article class="panel">
-        <div class="panel-inner">
-          <div class="panel-title-row">
-            <div>
-              <h2 class="panel-title">Queue</h2>
-              <p class="panel-subtitle">
-                Pending- und Error-Eintraege koennen geloescht oder erneut nach Maximo hochgeladen werden.
-              </p>
-            </div>
-            <button id="uploadButton" class="primary-button" type="button">Alle einbuchen</button>
-          </div>
-
-          <div id="queueSummary" class="queue-summary"></div>
-
-          <div class="queue-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Ort</th>
-                  <th>Serial</th>
-                  <th>Status</th>
-                  <th>Rueckgabe</th>
-                  <th>Aktion</th>
-                </tr>
-              </thead>
-              <tbody id="queueBody">
-                <tr>
-                  <td colspan="6" class="empty-row">Queue wird geladen...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div class="button-row" style="margin-top:16px;">
+          <button id="addButton" class="primary-button" type="submit">Zur Queue</button>
+          <button id="clearButton" class="secondary-button" type="button">Volatile Felder leeren</button>
         </div>
-      </article>
-    </section>
-  </main>
+      </form>
 
-  <script>
-    const MAC_SPEC_IDS = new Set(["bam.macadresse"]);
+    </div>
+  </article>
 
-    const state = {
-      templates: [],
-      locations: [],
-      queue: [],
-      selectedTemplate: null,
-      selectedLocation: null,
-      busy: false,
-    };
+  <!-- QUEUE CARD -->
+  <article>
+    <div class="section-header">
+      <div class="section-icon">&#128229;</div>
+      <div class="section-title">Upload-Queue</div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Template</th>
+            <th>Projekt</th>
+            <th>Location</th>
+            <th>Serialnr.</th>
+            <th>Status</th>
+            <th>Ergebnis</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="queueBody"></tbody>
+      </table>
+    </div>
+    <div id="queueSummary" class="queue-summary">Queue leer.</div>
+    <div class="upload-row">
+      <button id="uploadButton" class="primary-button" type="button">Alle hochladen</button>
+    </div>
+  </article>
 
-    const messageEl = document.getElementById("message");
-    const templateInput = document.getElementById("templateSearch");
-    const templateOptions = document.getElementById("templateOptions");
-    const locationOptions = document.getElementById("locationOptions");
-    const templateMeta = document.getElementById("templateMeta");
-    const dynamicFields = document.getElementById("dynamicFields");
-    const assetForm = document.getElementById("assetForm");
-    const queueBody = document.getElementById("queueBody");
-    const queueSummary = document.getElementById("queueSummary");
-    const addButton = document.getElementById("addButton");
-    const clearButton = document.getElementById("clearButton");
-    const uploadButton = document.getElementById("uploadButton");
+</main>
 
-    function normalizeText(value) {
-      return String(value || "").trim().toLowerCase();
+<script>
+"use strict";
+
+const MAC_SPEC_IDS = new Set(["bam.macadresse"]);
+
+/* ── state ── */
+const state = {
+  templates: [],
+  projects: [],
+  locations: [],
+  users: [],
+  selectedTemplate: null,
+  selectedProject: null,
+  selectedLocation: null,
+  assignedUsers: [],   // [{personid, isprimary, isuser, iscustodian}]
+  queue: [],
+  busy: false,
+};
+
+/* ── DOM refs ── */
+const messageBox      = document.getElementById("messageBox");
+const templateInput   = document.getElementById("templateSearch");
+const templateOptions = document.getElementById("templateOptions");
+const projectInput    = document.getElementById("projectSearch");
+const projectOptions  = document.getElementById("projectOptions");
+const locationInput   = document.getElementById("locationSearch");
+const locationOptions = document.getElementById("locationOptions");
+const userSearch      = document.getElementById("userSearch");
+const userOptions     = document.getElementById("userOptions");
+const addUserButton   = document.getElementById("addUserButton");
+const userListEl      = document.getElementById("userList");
+const templateMeta    = document.getElementById("templateMeta");
+const dynamicFields   = document.getElementById("dynamicFields");
+const assetForm       = document.getElementById("assetForm");
+const queueBody       = document.getElementById("queueBody");
+const queueSummary    = document.getElementById("queueSummary");
+const addButton       = document.getElementById("addButton");
+const clearButton     = document.getElementById("clearButton");
+const uploadButton    = document.getElementById("uploadButton");
+
+/* ── helpers ── */
+function showMessage(text, type) {
+  if (!text) {
+    messageBox.classList.remove("visible");
+    return;
+  }
+  messageBox.textContent = text;
+  messageBox.dataset.type = type || "info";
+  messageBox.classList.add("visible");
+}
+
+function setBusy(val) {
+  state.busy = val;
+  addButton.disabled = val;
+  clearButton.disabled = val;
+  uploadButton.disabled = val;
+  addUserButton.disabled = val;
+}
+
+function norm(v) {
+  return String(v || "").trim().toLowerCase();
+}
+
+function isMacSpec(name) {
+  return MAC_SPEC_IDS.has(norm(name));
+}
+
+function normalizeMac(value) {
+  const c = String(value || "").trim();
+  if (!c) return "";
+  const compact = c.replace(/[\s.:-]+/g, "");
+  if (!/^[0-9A-Fa-f]{12}$/.test(compact)) {
+    throw new Error("Ungueltige MAC-Adresse: erwartet NN:NN:NN:NN:NN:NN");
+  }
+  return compact.toUpperCase().match(/.{2}/g).join(":");
+}
+
+/* ── label builders ── */
+function buildTemplateLabel(t) {
+  return t ? t.description + " (" + t.itemnum + ")" : "";
+}
+
+function buildProjectLabel(p) {
+  return p ? p.description + " (" + p.projektcode + ")" : "";
+}
+
+function buildLocationLabel(l) {
+  if (!l) return "";
+  return l.description ? l.description + " (" + l.location + ")" : l.location;
+}
+
+function buildUserLabel(u) {
+  return u.displayname ? u.displayname + " (" + u.personid + ")" : u.personid;
+}
+
+/* ── finders ── */
+function findTemplate(raw) {
+  const v = norm(raw);
+  return state.templates.find(function(t) {
+    return norm(buildTemplateLabel(t)) === v || norm(t.itemnum) === v;
+  }) || null;
+}
+
+function findProject(raw) {
+  const v = norm(raw);
+  return state.projects.find(function(p) {
+    return norm(buildProjectLabel(p)) === v || norm(p.projektcode) === v;
+  }) || null;
+}
+
+function findLocation(raw) {
+  const v = norm(raw);
+  return state.locations.find(function(l) {
+    return norm(buildLocationLabel(l)) === v || norm(l.location) === v;
+  }) || null;
+}
+
+function findUser(raw) {
+  const v = norm(raw);
+  return state.users.find(function(u) {
+    return norm(buildUserLabel(u)) === v || norm(u.personid) === v;
+  }) || null;
+}
+
+/* ── datalist populators ── */
+function populateTemplateOptions() {
+  templateOptions.innerHTML = "";
+  state.templates.forEach(function(t) {
+    const opt = document.createElement("option");
+    opt.value = buildTemplateLabel(t);
+    templateOptions.appendChild(opt);
+  });
+}
+
+function populateProjectOptions() {
+  projectOptions.innerHTML = "";
+  state.projects.forEach(function(p) {
+    const opt = document.createElement("option");
+    opt.value = buildProjectLabel(p);
+    projectOptions.appendChild(opt);
+  });
+}
+
+function populateLocationOptions() {
+  locationOptions.innerHTML = "";
+  state.locations.forEach(function(l) {
+    const opt = document.createElement("option");
+    opt.value = buildLocationLabel(l);
+    locationOptions.appendChild(opt);
+  });
+}
+
+function populateUserOptions() {
+  userOptions.innerHTML = "";
+  state.users.forEach(function(u) {
+    const opt = document.createElement("option");
+    opt.value = buildUserLabel(u);
+    userOptions.appendChild(opt);
+  });
+}
+
+/* ── template meta ── */
+function renderTemplateMeta() {
+  templateMeta.innerHTML = "";
+  const t = state.selectedTemplate;
+  if (!t) {
+    const p = document.createElement("p");
+    p.className = "template-meta-empty";
+    p.textContent = "Noch kein Template aktiv. Nach Auswahl erscheinen die benoetigten Eingabefelder hier.";
+    templateMeta.appendChild(p);
+    renderDynamicFields();
+    return;
+  }
+
+  const title = document.createElement("div");
+  title.className = "meta-item";
+  const tl = document.createElement("div"); tl.className = "meta-label"; tl.textContent = "Beschreibung";
+  const tv = document.createElement("div"); tv.className = "meta-value"; tv.textContent = t.description || "-";
+  title.appendChild(tl); title.appendChild(tv);
+
+  const grid = document.createElement("div");
+  grid.className = "meta-grid";
+  [["Itemnum", t.itemnum], ["Site", t.siteid], ["Org", t.orgid], ["Classstructure", t.classstructureid]].forEach(function(pair) {
+    const item = document.createElement("div"); item.className = "meta-item";
+    const label = document.createElement("div"); label.className = "meta-label"; label.textContent = pair[0];
+    const val = document.createElement("div"); val.className = "meta-value code"; val.textContent = pair[1] || "-";
+    item.appendChild(label); item.appendChild(val);
+    grid.appendChild(item);
+  });
+
+  templateMeta.appendChild(title);
+  templateMeta.appendChild(grid);
+  renderDynamicFields();
+}
+
+/* ── dynamic fields ── */
+function renderDynamicFields() {
+  dynamicFields.innerHTML = "";
+  const t = state.selectedTemplate;
+  if (!t) {
+    const ph = document.createElement("div");
+    ph.className = "placeholder-box";
+    ph.textContent = "Keine Felder aktiv. Zuerst ein Template auswaehlen.";
+    dynamicFields.appendChild(ph);
+    return;
+  }
+
+  // serialnum always
+  dynamicFields.appendChild(createField("serialnum", "Serialnummer *", "text", "Seriennummer des Geraets"));
+
+  // user_specs
+  const specs = Array.isArray(t.user_specs) ? t.user_specs : [];
+  specs.forEach(function(specName) {
+    const isM = isMacSpec(specName);
+    const f = createField("spec__" + specName, specName + " *", "text", isM ? "Format: AA:BB:CC:DD:EE:FF" : "");
+    dynamicFields.appendChild(f);
+  });
+}
+
+function createField(name, label, type, hint) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "field";
+  const lbl = document.createElement("label");
+  lbl.setAttribute("for", "field_" + name);
+  lbl.textContent = label;
+  const inp = document.createElement("input");
+  inp.type = type || "text";
+  inp.id = "field_" + name;
+  inp.name = name;
+  inp.autocomplete = "off";
+  wrapper.appendChild(lbl);
+  wrapper.appendChild(inp);
+  if (hint) {
+    const h = document.createElement("div");
+    h.className = "field-hint";
+    h.textContent = hint;
+    wrapper.appendChild(h);
+  }
+  return wrapper;
+}
+
+/* ── user list ── */
+function renderUserList() {
+  userListEl.innerHTML = "";
+  if (state.assignedUsers.length === 0) return;
+
+  state.assignedUsers.forEach(function(u, idx) {
+    const entry = document.createElement("div");
+    entry.className = "user-entry";
+
+    const info = document.createElement("div");
+    info.className = "user-entry-info";
+
+    const nameRow = document.createElement("div");
+    nameRow.style.display = "flex";
+    nameRow.style.alignItems = "center";
+    nameRow.style.gap = "8px";
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "user-entry-name";
+    nameEl.textContent = u.personid;
+    nameRow.appendChild(nameEl);
+
+    if (u.isprimary) {
+      const badge = document.createElement("span");
+      badge.className = "primary-badge";
+      badge.textContent = "Primary";
+      nameRow.appendChild(badge);
     }
 
-    function isMacSpec(specName) {
-      return MAC_SPEC_IDS.has(normalizeText(specName));
+    info.appendChild(nameRow);
+
+    const roles = document.createElement("div");
+    roles.className = "user-entry-roles";
+
+    // isprimary checkbox
+    roles.appendChild(makeRoleCheck("Primary", u.isprimary, function(checked) {
+      if (checked) {
+        // unset primary on all others
+        state.assignedUsers.forEach(function(x, i) { if (i !== idx) x.isprimary = false; });
+      }
+      u.isprimary = checked;
+      renderUserList();
+    }));
+
+    // isuser
+    roles.appendChild(makeRoleCheck("User", u.isuser, function(checked) {
+      u.isuser = checked;
+      renderUserList();
+    }));
+
+    // iscustodian
+    roles.appendChild(makeRoleCheck("Custodian", u.iscustodian, function(checked) {
+      u.iscustodian = checked;
+      renderUserList();
+    }));
+
+    info.appendChild(roles);
+    entry.appendChild(info);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "danger-button";
+    removeBtn.type = "button";
+    removeBtn.textContent = "Entfernen";
+    removeBtn.addEventListener("click", function() {
+      state.assignedUsers.splice(idx, 1);
+      renderUserList();
+    });
+    entry.appendChild(removeBtn);
+
+    userListEl.appendChild(entry);
+  });
+}
+
+function makeRoleCheck(label, checked, onChange) {
+  const wrap = document.createElement("label");
+  wrap.className = "role-check";
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = checked;
+  cb.addEventListener("change", function() { onChange(cb.checked); });
+  wrap.appendChild(cb);
+  wrap.appendChild(document.createTextNode(label));
+  return wrap;
+}
+
+/* ── status chip ── */
+function createStatusChip(s) {
+  const chip = document.createElement("span");
+  chip.className = "status-chip " + (s === "ok" ? "ok" : s === "error" ? "error" : "pending");
+  chip.textContent = s || "pending";
+  return chip;
+}
+
+function createCell(text, cls) {
+  const td = document.createElement("td");
+  if (cls) td.className = cls;
+  td.textContent = text || "-";
+  return td;
+}
+
+/* ── queue render ── */
+function renderQueue() {
+  queueBody.innerHTML = "";
+  const q = state.queue;
+  if (q.length === 0) {
+    queueSummary.textContent = "Queue leer.";
+    return;
+  }
+  const pending = q.filter(function(e) { return e.status === "pending"; }).length;
+  const ok = q.filter(function(e) { return e.status === "ok"; }).length;
+  const err = q.filter(function(e) { return e.status === "error"; }).length;
+  queueSummary.textContent = q.length + " Eintraege — " + pending + " ausstehend, " + ok + " OK, " + err + " Fehler";
+
+  q.forEach(function(entry) {
+    const row = document.createElement("tr");
+
+    const itemCell = document.createElement("td");
+    const itemTitle = document.createElement("div"); itemTitle.className = "cell-code"; itemTitle.textContent = entry.itemnum || "-";
+    const itemDesc = document.createElement("div"); itemDesc.className = "cell-muted"; itemDesc.textContent = entry.description || "";
+    itemCell.appendChild(itemTitle); itemCell.appendChild(itemDesc);
+
+    const statusCell = document.createElement("td");
+    statusCell.appendChild(createStatusChip(entry.status));
+
+    const resultCell = document.createElement("td");
+    resultCell.className = "cell-muted";
+    resultCell.textContent = entry.assetnum || entry.error || "-";
+
+    const actionCell = document.createElement("td");
+    const delBtn = document.createElement("button");
+    delBtn.className = "danger-button";
+    delBtn.type = "button";
+    delBtn.textContent = "Delete";
+    delBtn.disabled = state.busy;
+    delBtn.addEventListener("click", function() { deleteQueueEntry(entry.id); });
+    actionCell.appendChild(delBtn);
+
+    row.appendChild(itemCell);
+    row.appendChild(createCell(entry.projektcode, "cell-code"));
+    row.appendChild(createCell(entry.location, "cell-code"));
+    row.appendChild(createCell(entry.serialnum, "cell-code"));
+    row.appendChild(statusCell);
+    row.appendChild(resultCell);
+    row.appendChild(actionCell);
+
+    queueBody.appendChild(row);
+  });
+}
+
+/* ── API calls ── */
+async function loadData() {
+  const [tRes, pRes, lRes, uRes] = await Promise.all([
+    fetch("/api/templates"),
+    fetch("/api/projects"),
+    fetch("/api/locations"),
+    fetch("/api/users"),
+  ]);
+
+  if (!tRes.ok) throw new Error("Templates konnten nicht geladen werden");
+  if (!pRes.ok) throw new Error("Projekte konnten nicht geladen werden");
+  if (!lRes.ok) throw new Error("Locations konnten nicht geladen werden");
+  if (!uRes.ok) throw new Error("Users konnten nicht geladen werden");
+
+  state.templates = await tRes.json();
+  state.projects  = await pRes.json();
+  state.locations = await lRes.json();
+  state.users     = await uRes.json();
+
+  populateTemplateOptions();
+  populateProjectOptions();
+  populateLocationOptions();
+  populateUserOptions();
+}
+
+async function loadQueue() {
+  const res = await fetch("/api/queue");
+  if (!res.ok) return;
+  state.queue = await res.json();
+  renderQueue();
+}
+
+async function addToQueue(entry) {
+  const res = await fetch("/api/queue", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Fehler beim Hinzufuegen");
+  state.queue = data;
+  renderQueue();
+}
+
+async function deleteQueueEntry(id) {
+  const res = await fetch("/api/queue/" + id, { method: "DELETE" });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Loeschen fehlgeschlagen");
+  state.queue = data;
+  renderQueue();
+}
+
+async function uploadQueue() {
+  const res = await fetch("/api/upload", { method: "POST" });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Upload fehlgeschlagen");
+  state.queue = data.queue;
+  renderQueue();
+
+  const okCount  = (data.results || []).filter(function(r) { return r.success; }).length;
+  const errCount = (data.results || []).filter(function(r) { return !r.success; }).length;
+  showMessage("Upload fertig: " + okCount + " OK, " + errCount + " Fehler", okCount > 0 ? "ok" : "error");
+}
+
+/* ── collect entry ── */
+function collectEntry() {
+  if (!state.selectedTemplate) throw new Error("Bitte zuerst ein gueltiges Template auswaehlen.");
+  if (!state.selectedProject)  throw new Error("Bitte zuerst ein Projekt auswaehlen.");
+  if (!state.selectedLocation) throw new Error("Bitte zuerst eine Location auswaehlen.");
+
+  const serialEl = assetForm.elements["serialnum"];
+  const serialnum = serialEl ? serialEl.value.trim() : "";
+  if (!serialnum) throw new Error("Serialnummer ist ein Pflichtfeld.");
+
+  const userSpecs = {};
+  const specs = Array.isArray(state.selectedTemplate.user_specs) ? state.selectedTemplate.user_specs : [];
+  specs.forEach(function(specName) {
+    const el = assetForm.elements["spec__" + specName];
+    let value = el ? el.value.trim() : "";
+    if (isMacSpec(specName)) {
+      value = normalizeMac(value);
+      if (el) el.value = value;
     }
-
-    function normalizeMacAddress(value) {
-      const cleanedValue = String(value || "").trim();
-      if (!cleanedValue) {
-        return "";
-      }
-
-      const compactValue = cleanedValue.replace(/[\s.:-]+/g, "");
-      if (!/^[0-9A-Fa-f]{12}$/.test(compactValue)) {
-        throw new Error("Ungueltige MAC-Adresse: erwartet NN:NN:NN:NN:NN:NN.");
-      }
-
-      return compactValue
-        .toUpperCase()
-        .match(/.{2}/g)
-        .join(":");
-    }
-
-    function normalizeSpecValue(specName, value) {
-      const cleanedValue = String(value || "").trim();
-      if (isMacSpec(specName)) {
-        return normalizeMacAddress(cleanedValue);
-      }
-
-      return cleanedValue;
-    }
-
-    function showMessage(text, type) {
-      if (!text) {
-        messageEl.textContent = "";
-        messageEl.removeAttribute("data-type");
-        return;
-      }
-
-      messageEl.textContent = text;
-      messageEl.setAttribute("data-type", type || "info");
-    }
-
-    function setBusy(nextBusy) {
-      state.busy = nextBusy;
-      addButton.disabled = nextBusy;
-      clearButton.disabled = nextBusy;
-      uploadButton.disabled = nextBusy;
-    }
-
-    function buildTemplateLabel(template) {
-      const description = template.description || "Ohne Beschreibung";
-      return `${description} (${template.itemnum || "?"})`;
-    }
-
-    function buildLocationLabel(location) {
-      if (!location) {
-        return "";
-      }
-
-      const description = location.description || "Ohne Beschreibung";
-      return `${description} (${location.location || "?"})`;
-    }
-
-    function findTemplate(value) {
-      const normalized = normalizeText(value);
-      if (!normalized) {
-        return null;
-      }
-
-      return state.templates.find((template) => {
-        return (
-          normalizeText(buildTemplateLabel(template)) === normalized ||
-          normalizeText(template.itemnum) === normalized
-        );
-      }) || null;
-    }
-
-    function findLocation(value) {
-      const normalized = normalizeText(value);
-      if (!normalized) {
-        return null;
-      }
-
-      return state.locations.find((location) => {
-        return (
-          normalizeText(buildLocationLabel(location)) === normalized ||
-          normalizeText(location.location) === normalized ||
-          normalizeText(location.description) === normalized
-        );
-      }) || null;
-    }
-
-    function createMetaItem(label, value, isCode) {
-      const wrapper = document.createElement("div");
-      wrapper.className = "meta-item";
-
-      const labelEl = document.createElement("div");
-      labelEl.className = "meta-label";
-      labelEl.textContent = label;
-
-      const valueEl = document.createElement("div");
-      valueEl.className = `meta-value${isCode ? " code" : ""}`;
-      valueEl.textContent = value || "-";
-
-      wrapper.append(labelEl, valueEl);
-      return wrapper;
-    }
-
-    function renderTemplateMeta(template) {
-      templateMeta.innerHTML = "";
-
-      if (!template) {
-        const emptyText = document.createElement("p");
-        emptyText.className = "template-meta-empty";
-        emptyText.textContent = "Noch kein Template aktiv. Nach Auswahl erscheinen die benoetigten Eingabefelder hier.";
-        templateMeta.append(emptyText);
-        return;
-      }
-
-      const title = document.createElement("div");
-      title.className = "meta-item";
-
-      const titleLabel = document.createElement("div");
-      titleLabel.className = "meta-label";
-      titleLabel.textContent = "Beschreibung";
-
-      const titleValue = document.createElement("div");
-      titleValue.className = "meta-value";
-      titleValue.textContent = template.description || "Ohne Beschreibung";
-
-      title.append(titleLabel, titleValue);
-
-      const grid = document.createElement("div");
-      grid.className = "meta-grid";
-      grid.append(
-        createMetaItem("Itemnum", template.itemnum, true),
-        createMetaItem("Site", template.siteid, true),
-        createMetaItem("Org", template.orgid, true),
-        createMetaItem("Classstructure", template.classstructureid, true)
-      );
-
-      templateMeta.append(title, grid);
-    }
-
-    function createField(name, label) {
-      const wrapper = document.createElement("div");
-      wrapper.className = "field";
-
-      const labelEl = document.createElement("label");
-      labelEl.setAttribute("for", name);
-      labelEl.textContent = label;
-
-      const input = document.createElement("input");
-      input.id = name;
-      input.name = name;
-      input.type = "text";
-      input.required = true;
-      input.autocomplete = "off";
-      input.spellcheck = false;
-
-      wrapper.append(labelEl, input);
-      return wrapper;
-    }
-
-    function getLocationInput() {
-      return assetForm.elements.location || null;
-    }
-
-    function syncLocationInput() {
-      const locationInput = getLocationInput();
-      if (!locationInput) {
-        return;
-      }
-
-      locationInput.value = state.selectedLocation
-        ? buildLocationLabel(state.selectedLocation)
-        : "";
-    }
-
-    function selectLocation(location) {
-      if (!location) {
-        return;
-      }
-
-      state.selectedLocation = location;
-      syncLocationInput();
-    }
-
-    function focusPrimaryField() {
-      const locationInput = getLocationInput();
-      if (locationInput && !state.selectedLocation) {
-        locationInput.focus();
-        locationInput.select();
-        return;
-      }
-
-      const serialInput = assetForm.elements.serialnum || null;
-      if (serialInput) {
-        serialInput.focus();
-        serialInput.select();
-        return;
-      }
-
-      const firstInput = dynamicFields.querySelector("input");
-      if (firstInput) {
-        firstInput.focus();
-        firstInput.select();
-      }
-    }
-
-    function createLocationField() {
-      const wrapper = createField("location", "Location");
-      const input = wrapper.querySelector("input");
-      input.setAttribute("list", "locationOptions");
-      input.placeholder = "Beschreibung oder Location-Code eingeben";
-
-      const hint = document.createElement("div");
-      hint.className = "field-hint";
-      hint.textContent = "Exakter Treffer per Beschreibung oder Location-Code.";
-
-      input.addEventListener("input", handleLocationInput);
-      input.addEventListener("change", handleLocationInput);
-      input.addEventListener("blur", handleLocationInput);
-
-      wrapper.append(hint);
-      return wrapper;
-    }
-
-    function createSpecField(specName) {
-      const wrapper = createField(`spec__${specName}`, specName);
-      const input = wrapper.querySelector("input");
-
-      if (!isMacSpec(specName)) {
-        return wrapper;
-      }
-
-      input.placeholder = "0011.2233.4455 oder 00:11:22:33:44:55";
-
-      const hint = document.createElement("div");
-      hint.className = "field-hint";
-      hint.textContent = "Scanner-Formate werden automatisch nach NN:NN:NN:NN:NN:NN konvertiert.";
-
-      const normalizeFieldValue = (shouldReport) => {
-        if (!input.value.trim()) {
-          input.setCustomValidity("");
-          return;
-        }
-
-        try {
-          input.value = normalizeMacAddress(input.value);
-          input.setCustomValidity("");
-        } catch (error) {
-          input.setCustomValidity(error.message || String(error));
-          if (shouldReport) {
-            input.reportValidity();
-          }
-        }
-      };
-
-      input.addEventListener("input", () => {
-        input.setCustomValidity("");
-      });
-      input.addEventListener("change", () => normalizeFieldValue(true));
-      input.addEventListener("blur", () => normalizeFieldValue(false));
-
-      wrapper.append(hint);
-      return wrapper;
-    }
-
-    function resolveUserFields(template) {
-      const userFields = Array.isArray(template.user_fields) && template.user_fields.length
-        ? [...template.user_fields]
-        : ["serialnum", "location"];
-
-      if (!userFields.includes("serialnum")) {
-        userFields.unshift("serialnum");
-      }
-
-      if (!userFields.includes("location")) {
-        userFields.push("location");
-      }
-
-      return userFields;
-    }
-
-    function renderDynamicFields(template) {
-      dynamicFields.innerHTML = "";
-
-      if (!template) {
-        const empty = document.createElement("div");
-        empty.className = "placeholder-box";
-        empty.textContent = "Keine Felder aktiv. Zuerst ein Template auswaehlen.";
-        dynamicFields.append(empty);
-        return;
-      }
-
-      const userFields = resolveUserFields(template);
-
-      userFields.forEach((fieldName) => {
-        if (fieldName === "location") {
-          dynamicFields.append(createLocationField());
-          return;
-        }
-
-        const label = fieldName === "serialnum"
-          ? "Serialnummer"
-          : fieldName;
-        dynamicFields.append(createField(fieldName, label));
-      });
-
-      if (Array.isArray(template.user_specs) && template.user_specs.length) {
-        template.user_specs.forEach((specName) => {
-          dynamicFields.append(createSpecField(specName));
-        });
-      }
-
-      syncLocationInput();
-    }
-
-    function activateTemplate(template) {
-      if (!template) {
-        return;
-      }
-
-      const isSameTemplate = state.selectedTemplate && state.selectedTemplate.itemnum === template.itemnum;
-
-      state.selectedTemplate = template;
-      templateInput.value = buildTemplateLabel(template);
-      renderTemplateMeta(template);
-
-      if (!isSameTemplate) {
-        renderDynamicFields(template);
-      }
-
-      if (!isSameTemplate || !dynamicFields.contains(document.activeElement)) {
-        focusPrimaryField();
-      }
-    }
-
-    function resetForm() {
-      assetForm.reset();
-
-      if (!state.selectedTemplate) {
-        renderTemplateMeta(null);
-        renderDynamicFields(null);
-        templateInput.value = "";
-        templateInput.focus();
-        return;
-      }
-
-      templateInput.value = buildTemplateLabel(state.selectedTemplate);
-      syncLocationInput();
-      focusPrimaryField();
-    }
-
-    function collectEntry() {
-      if (!state.selectedTemplate) {
-        throw new Error("Bitte zuerst ein gueltiges Template auswaehlen.");
-      }
-
-      if (!state.selectedLocation) {
-        throw new Error("Bitte zuerst eine gueltige Location auswaehlen.");
-      }
-
-      const serialnum = assetForm.elements.serialnum ? assetForm.elements.serialnum.value.trim() : "";
-      const location = state.selectedLocation.location || "";
-
-      if (!serialnum || !location) {
-        throw new Error("Serialnummer und Location sind Pflichtfelder.");
-      }
-
-      const userSpecs = {};
-      const specNames = Array.isArray(state.selectedTemplate.user_specs)
-        ? state.selectedTemplate.user_specs
-        : [];
-
-      for (const specName of specNames) {
-        const fieldName = `spec__${specName}`;
-        const element = assetForm.elements[fieldName];
-        let value = "";
-
-        try {
-          value = normalizeSpecValue(specName, element ? element.value : "");
-        } catch (error) {
-          throw new Error(`${specName}: ${error.message || String(error)}`);
-        }
-
-        if (!value) {
-          throw new Error(`Pflichtwert fehlt fuer ${specName}.`);
-        }
-        if (element) {
-          element.value = value;
-          element.setCustomValidity("");
-        }
-        userSpecs[specName] = value;
-      }
-
+    if (!value) throw new Error("Pflichtwert fehlt fuer: " + specName);
+    userSpecs[specName] = value;
+  });
+
+  const t = state.selectedTemplate;
+  const p = state.selectedProject;
+  const l = state.selectedLocation;
+
+  return {
+    itemnum:          t.itemnum,
+    description:      t.description,
+    siteid:           t.siteid,
+    orgid:            t.orgid,
+    classstructureid: t.classstructureid,
+    fixed_specs:      t.fixed_specs || {},
+    user_specs:       userSpecs,
+    projektcode:      p.projektcode,
+    location:         l.location,
+    serialnum:        serialnum,
+    users:            state.assignedUsers.map(function(u) {
       return {
-        itemnum: state.selectedTemplate.itemnum,
-        description: state.selectedTemplate.description || "",
-        siteid: state.selectedTemplate.siteid || state.selectedLocation.siteid || "",
-        orgid: state.selectedTemplate.orgid || "",
-        classstructureid: state.selectedTemplate.classstructureid || "",
-        location,
-        serialnum,
-        fixed_specs: state.selectedTemplate.fixed_specs || {},
-        user_specs: userSpecs,
+        personid:    u.personid,
+        isprimary:   u.isprimary,
+        isuser:      u.isuser,
+        iscustodian: u.iscustodian,
       };
-    }
+    }),
+  };
+}
 
-    function createSummaryChip(label, count, className) {
-      const chip = document.createElement("div");
-      chip.className = `summary-chip ${className || ""}`.trim();
-      chip.append(`${label}: ${count}`);
-      return chip;
-    }
+/* ── volatile field clear (keeps persistent state) ── */
+function clearVolatileFields() {
+  // reset only dynamic form fields
+  const inputs = dynamicFields.querySelectorAll("input");
+  inputs.forEach(function(inp) { inp.value = ""; });
+}
 
-    function createStatusChip(status) {
-      const chip = document.createElement("span");
-      const normalized = status || "pending";
-      chip.className = `status-chip status-${normalized}`;
-      chip.textContent = normalized;
-      return chip;
-    }
+/* ── focus first dynamic field ── */
+function focusPrimaryField() {
+  const inp = dynamicFields.querySelector("input");
+  if (inp) inp.focus();
+}
 
-    function createCell(text, className) {
-      const cell = document.createElement("td");
-      if (className) {
-        cell.className = className;
-      }
-      cell.textContent = text || "-";
-      return cell;
-    }
+/* ── event listeners ── */
+templateInput.addEventListener("change", function() {
+  const found = findTemplate(templateInput.value);
+  state.selectedTemplate = found;
+  if (found) templateInput.value = buildTemplateLabel(found);
+  renderTemplateMeta();
+  if (found) focusPrimaryField();
+});
 
-    function renderQueueSummary() {
-      const pending = state.queue.filter((entry) => entry.status === "pending").length;
-      const success = state.queue.filter((entry) => entry.status === "success").length;
-      const error = state.queue.filter((entry) => entry.status === "error").length;
-      const retryable = pending + error;
+projectInput.addEventListener("change", function() {
+  const found = findProject(projectInput.value);
+  state.selectedProject = found;
+  if (found) projectInput.value = buildProjectLabel(found);
+});
 
-      queueSummary.innerHTML = "";
-      queueSummary.append(
-        createSummaryChip("Gesamt", state.queue.length),
-        createSummaryChip("Pending", pending, "status-pending"),
-        createSummaryChip("Success", success, "status-success"),
-        createSummaryChip("Error", error, "status-error")
-      );
+locationInput.addEventListener("change", function() {
+  const found = findLocation(locationInput.value);
+  state.selectedLocation = found;
+  if (found) locationInput.value = buildLocationLabel(found);
+});
 
-      uploadButton.disabled = state.busy || retryable === 0;
-    }
+addUserButton.addEventListener("click", function() {
+  const found = findUser(userSearch.value);
+  if (!found) { showMessage("User nicht gefunden.", "error"); return; }
+  const already = state.assignedUsers.some(function(u) { return u.personid === found.personid; });
+  if (already) { showMessage("User bereits zugeordnet.", "error"); return; }
 
-    function renderQueue() {
-      queueBody.innerHTML = "";
+  state.assignedUsers.push({
+    personid:    found.personid,
+    isprimary:   state.assignedUsers.length === 0,
+    isuser:      true,
+    iscustodian: false,
+  });
+  userSearch.value = "";
+  showMessage("");
+  renderUserList();
+});
 
-      if (!state.queue.length) {
-        const row = document.createElement("tr");
-        const cell = document.createElement("td");
-        cell.colSpan = 6;
-        cell.className = "empty-row";
-        cell.textContent = "Queue ist leer.";
-        row.append(cell);
-        queueBody.append(row);
-        renderQueueSummary();
-        return;
-      }
+assetForm.addEventListener("submit", async function(e) {
+  e.preventDefault();
+  showMessage("");
+  let entry;
+  try { entry = collectEntry(); } catch (err) { showMessage(err.message, "error"); return; }
+  setBusy(true);
+  try {
+    await addToQueue(entry);
+    clearVolatileFields();
+    showMessage("Asset zur Queue hinzugefuegt.", "ok");
+    focusPrimaryField();
+  } catch (err) {
+    showMessage(err.message, "error");
+  } finally {
+    setBusy(false);
+  }
+});
 
-      state.queue.forEach((entry) => {
-        const row = document.createElement("tr");
+clearButton.addEventListener("click", function() {
+  clearVolatileFields();
+  showMessage("");
+});
 
-        const itemCell = document.createElement("td");
-        const itemTitle = document.createElement("div");
-        itemTitle.className = "cell-code";
-        itemTitle.textContent = entry.itemnum || "-";
-        const itemDesc = document.createElement("div");
-        itemDesc.className = "cell-muted";
-        itemDesc.textContent = entry.description || "";
-        itemCell.append(itemTitle, itemDesc);
+uploadButton.addEventListener("click", async function() {
+  if (state.queue.length === 0) { showMessage("Queue ist leer.", "info"); return; }
+  setBusy(true);
+  showMessage("");
+  try {
+    await uploadQueue();
+  } catch (err) {
+    showMessage(err.message, "error");
+  } finally {
+    setBusy(false);
+  }
+});
 
-        const statusCell = document.createElement("td");
-        statusCell.append(createStatusChip(entry.status));
-
-        const resultCell = document.createElement("td");
-        resultCell.className = "cell-muted";
-        resultCell.textContent = entry.assetnum || entry.error || "-";
-
-        const actionCell = document.createElement("td");
-        const deleteButton = document.createElement("button");
-        deleteButton.className = "danger-button";
-        deleteButton.type = "button";
-        deleteButton.textContent = "Delete";
-        deleteButton.disabled = state.busy;
-        deleteButton.addEventListener("click", () => deleteQueueEntry(entry.id));
-        actionCell.append(deleteButton);
-
-        row.append(
-          itemCell,
-          createCell(entry.location, "cell-code"),
-          createCell(entry.serialnum, "cell-code"),
-          statusCell,
-          resultCell,
-          actionCell
-        );
-
-        queueBody.append(row);
-      });
-
-      renderQueueSummary();
-    }
-
-    async function parseError(response) {
-      try {
-        const data = await response.json();
-        if (data && typeof data.detail === "string") {
-          return data.detail;
-        }
-        return JSON.stringify(data);
-      } catch (error) {
-        return `${response.status} ${response.statusText}`;
-      }
-    }
-
-    async function loadTemplates() {
-      const response = await fetch("/api/templates");
-      if (!response.ok) {
-        throw new Error(await parseError(response));
-      }
-
-      state.templates = await response.json();
-      templateOptions.innerHTML = "";
-
-      state.templates.forEach((template) => {
-        const option = document.createElement("option");
-        option.value = buildTemplateLabel(template);
-        templateOptions.append(option);
-      });
-    }
-
-    async function loadLocations() {
-      const response = await fetch("/api/locations");
-      if (!response.ok) {
-        throw new Error(await parseError(response));
-      }
-
-      state.locations = await response.json();
-      locationOptions.innerHTML = "";
-
-      state.locations.forEach((location) => {
-        const option = document.createElement("option");
-        option.value = buildLocationLabel(location);
-        locationOptions.append(option);
-      });
-    }
-
-    async function loadQueue() {
-      const response = await fetch("/api/queue");
-      if (!response.ok) {
-        throw new Error(await parseError(response));
-      }
-
-      state.queue = await response.json();
-      renderQueue();
-    }
-
-    async function addQueueEntry(event) {
-      event.preventDefault();
-
-      try {
-        setBusy(true);
-        const entry = collectEntry();
-        const response = await fetch("/api/queue", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(entry),
-        });
-
-        if (!response.ok) {
-          throw new Error(await parseError(response));
-        }
-
-        const created = await response.json();
-        state.queue.push(created);
-        renderQueue();
-        showMessage(`Eintrag ${created.itemnum} wurde zur Queue hinzugefuegt.`, "success");
-        resetForm();
-      } catch (error) {
-        showMessage(error.message || String(error), "error");
-      } finally {
-        setBusy(false);
-        renderQueueSummary();
-      }
-    }
-
-    async function deleteQueueEntry(entryId) {
-      try {
-        setBusy(true);
-        const response = await fetch(`/api/queue/${entryId}`, {
-          method: "DELETE",
-        });
-
-        if (!response.ok) {
-          throw new Error(await parseError(response));
-        }
-
-        state.queue = state.queue.filter((entry) => entry.id !== entryId);
-        renderQueue();
-        showMessage("Queue-Eintrag geloescht.", "success");
-      } catch (error) {
-        showMessage(error.message || String(error), "error");
-      } finally {
-        setBusy(false);
-        renderQueueSummary();
-      }
-    }
-
-    async function uploadQueue() {
-      try {
-        setBusy(true);
-        const response = await fetch("/api/upload", {
-          method: "POST",
-        });
-
-        if (!response.ok) {
-          throw new Error(await parseError(response));
-        }
-
-        const data = await response.json();
-        state.queue = Array.isArray(data.queue) ? data.queue : [];
-        renderQueue();
-
-        const resultCount = Array.isArray(data.results) ? data.results.length : 0;
-        showMessage(`${resultCount} Eintraege wurden verarbeitet.`, "success");
-      } catch (error) {
-        showMessage(error.message || String(error), "error");
-      } finally {
-        setBusy(false);
-        renderQueueSummary();
-      }
-    }
-
-    function handleTemplateInput() {
-      const template = findTemplate(templateInput.value);
-      if (!template) {
-        if (state.selectedTemplate && document.activeElement !== templateInput) {
-          templateInput.value = buildTemplateLabel(state.selectedTemplate);
-        }
-        return;
-      }
-
-      activateTemplate(template);
-    }
-
-    function handleLocationInput() {
-      const locationInput = getLocationInput();
-      if (!locationInput) {
-        return;
-      }
-
-      const location = findLocation(locationInput.value);
-      if (!location) {
-        if (state.selectedLocation && document.activeElement !== locationInput) {
-          syncLocationInput();
-        }
-        return;
-      }
-
-      selectLocation(location);
-    }
-
-    async function init() {
-      try {
-        setBusy(true);
-        await loadTemplates();
-        await loadLocations();
-        await loadQueue();
-        showMessage("Templates geladen. Erfassung ist bereit.", "info");
-      } catch (error) {
-        showMessage(error.message || String(error), "error");
-      } finally {
-        setBusy(false);
-        renderQueueSummary();
-        templateInput.focus();
-      }
-    }
-
-    templateInput.addEventListener("input", handleTemplateInput);
-    templateInput.addEventListener("change", handleTemplateInput);
-    assetForm.addEventListener("submit", addQueueEntry);
-    clearButton.addEventListener("click", resetForm);
-    uploadButton.addEventListener("click", uploadQueue);
-    templateInput.addEventListener("blur", handleTemplateInput);
-
-    init();
-  </script>
+/* ── init ── */
+(async function init() {
+  setBusy(true);
+  try {
+    await loadData();
+    await loadQueue();
+  } catch (err) {
+    showMessage("Initialisierung fehlgeschlagen: " + err.message, "error");
+  } finally {
+    setBusy(false);
+  }
+})();
+</script>
 </body>
 </html>

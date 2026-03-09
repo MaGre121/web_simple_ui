@@ -46,18 +46,17 @@ def _normalize_mac_address(value: Any, field_label: str) -> str:
 
     compact_value = compact_value.upper()
     return ":".join(
-        compact_value[index:index + 2]
-        for index in range(0, len(compact_value), 2)
+        compact_value[i:i + 2] for i in range(0, len(compact_value), 2)
     )
 
 
-def _normalize_specs(specs: Any, field_name: str) -> dict[str, str]:
+def _normalize_specs(specs: Any, label: str) -> dict[str, str]:
     if specs is None:
         return {}
     if not isinstance(specs, dict):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"{field_name} muss ein Objekt sein",
+            detail=f"{label} muss ein JSON-Objekt sein",
         )
 
     normalized = {}
@@ -65,21 +64,42 @@ def _normalize_specs(specs: Any, field_name: str) -> dict[str, str]:
         cleaned_key = _clean_text(key)
         if not cleaned_key:
             continue
+
         cleaned_value = _clean_text(value)
         if _is_mac_spec(cleaned_key):
             cleaned_value = _normalize_mac_address(cleaned_value, cleaned_key)
+
         normalized[cleaned_key] = cleaned_value
 
     return normalized
 
 
-def _validate_queue_entry(payload: Any) -> dict[str, Any]:
-    if not isinstance(payload, dict):
+def _normalize_users(users: Any) -> list[dict]:
+    if users is None:
+        return []
+    if not isinstance(users, list):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Ungueltiger Queue-Eintrag",
+            detail="users muss ein JSON-Array sein",
         )
 
+    normalized = []
+    for u in users:
+        if not isinstance(u, dict):
+            continue
+        personid = _clean_text(u.get("personid"))
+        if not personid:
+            continue
+        normalized.append({
+            "personid": personid,
+            "isprimary": bool(u.get("isprimary", False)),
+            "isuser": bool(u.get("isuser", False)),
+            "iscustodian": bool(u.get("iscustodian", False)),
+        })
+    return normalized
+
+
+def _validate_entry(payload: dict) -> dict:
     entry = {
         "itemnum": _clean_text(payload.get("itemnum")),
         "description": _clean_text(payload.get("description")),
@@ -88,11 +108,13 @@ def _validate_queue_entry(payload: Any) -> dict[str, Any]:
         "classstructureid": _clean_text(payload.get("classstructureid")),
         "location": _clean_text(payload.get("location")),
         "serialnum": _clean_text(payload.get("serialnum")),
+        "projekt": _clean_text(payload.get("projekt")),
+        "users": _normalize_users(payload.get("users")),
         "fixed_specs": _normalize_specs(payload.get("fixed_specs"), "fixed_specs"),
         "user_specs": _normalize_specs(payload.get("user_specs"), "user_specs"),
     }
 
-    required_fields = ("itemnum", "siteid", "orgid", "location", "serialnum")
+    required_fields = ("itemnum", "siteid", "orgid", "location", "serialnum", "projekt")
     missing_fields = [field for field in required_fields if not entry[field]]
     if missing_fields:
         raise HTTPException(
@@ -107,6 +129,13 @@ def _validate_queue_entry(payload: Any) -> dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Pflichtwerte fehlen fuer Specs: {', '.join(missing_user_specs)}",
+        )
+
+    primary_count = sum(1 for u in entry["users"] if u["isprimary"])
+    if primary_count > 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nur ein User darf isprimary=true haben.",
         )
 
     return entry
@@ -139,6 +168,30 @@ def _load_templates() -> list[dict]:
     return templates
 
 
+def _load_json_list(path: Path, label: str) -> list[dict]:
+    if not path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{label}-Datei fehlt: {path}",
+        )
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"{label}-Datei ungueltig: {exc}",
+        ) from exc
+
+    if not isinstance(data, list):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"{label}-Datei muss ein JSON-Array enthalten",
+        )
+
+    return data
+
+
 def _normalize_location_option(
     location: Any,
     description: Any,
@@ -164,17 +217,18 @@ def _collect_locations_from_tree(
     if not isinstance(nodes, dict):
         return
 
-    for node_id, node in nodes.items():
+    for loc_id, node in nodes.items():
         if not isinstance(node, dict):
             continue
 
         option = _normalize_location_option(
-            node.get("location") or node_id,
-            node.get("description"),
-            node.get("siteid"),
-            node.get("parent"),
+            location=node.get("location", loc_id),
+            description=node.get("description"),
+            siteid=node.get("siteid"),
+            parent=node.get("parent"),
         )
-        if option:
+
+        if option and option["location"] not in collected:
             collected[option["location"]] = option
 
         children = node.get("children")
@@ -256,44 +310,37 @@ def _load_locations() -> list[dict[str, str]]:
 def _load_queue_or_http_error() -> list[dict]:
     try:
         return load_queue()
-    except RuntimeError as exc:
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
+            detail=f"Queue konnte nicht geladen werden: {exc}",
         ) from exc
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    settings.CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    if not settings.CACHE_QUEUE_FILE.exists():
-        settings.CACHE_QUEUE_FILE.write_text("[]\n", encoding="utf-8")
-
     app.state.server = None
     app.state.session = None
     app.state.startup_error = None
 
     try:
         server, token = load_environment()
+        session = create_session(token)
         app.state.server = server
-        app.state.session = create_session(token)
-        logger.info("Maximo Session erfolgreich initialisiert")
-    except Exception as exc:  # pragma: no cover - startup protection
-        app.state.startup_error = str(exc)
-        logger.warning("Maximo Session konnte nicht initialisiert werden: %s", exc)
+        app.state.session = session
+        logger.info("Maximo-Session initialisiert fuer %s", server)
+    except Exception as exc:
+        app.state.startup_error = f"Session-Fehler: {exc}"
+        logger.error("Startup fehlgeschlagen: %s", exc)
 
     yield
 
-    session = getattr(app.state, "session", None)
-    if session is not None:
-        session.close()
+
+app = FastAPI(lifespan=lifespan)
 
 
-app = FastAPI(title="Maximo Asset Scan UI", lifespan=lifespan)
-
-
-@app.get("/", response_class=FileResponse)
-def index():
+@app.get("/")
+def serve_index():
     return FileResponse(INDEX_FILE)
 
 
@@ -307,18 +354,14 @@ def get_locations():
     return JSONResponse(_load_locations())
 
 
-@app.post("/api/queue", status_code=status.HTTP_201_CREATED)
-def create_queue_entry(payload: dict[str, Any] = Body(...)):
-    entry = _validate_queue_entry(payload)
-    try:
-        created_entry = add_to_queue(entry)
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
-        ) from exc
+@app.get("/api/users")
+def get_users():
+    return JSONResponse(_load_json_list(settings.CACHE_USERS_FILE, "Users"))
 
-    return JSONResponse(created_entry, status_code=status.HTTP_201_CREATED)
+
+@app.get("/api/projects")
+def get_projects():
+    return JSONResponse(_load_json_list(settings.CACHE_PROJECTS_FILE, "Projects"))
 
 
 @app.get("/api/queue")
@@ -326,15 +369,19 @@ def get_queue():
     return JSONResponse(_load_queue_or_http_error())
 
 
-@app.delete("/api/queue/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.post("/api/queue")
+def add_queue_entry(payload: dict = Body(...)):
+    entry = _validate_entry(payload)
+    queue = _load_queue_or_http_error()
+    updated_queue = add_to_queue(queue, entry)
+    save_queue(updated_queue)
+    return JSONResponse(updated_queue, status_code=status.HTTP_201_CREATED)
+
+
+@app.delete("/api/queue/{entry_id}")
 def delete_queue_entry(entry_id: str):
-    try:
-        removed = remove_from_queue(entry_id)
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
-        ) from exc
+    queue = _load_queue_or_http_error()
+    removed = remove_from_queue(queue, entry_id)
 
     if not removed:
         raise HTTPException(
