@@ -8,6 +8,7 @@ from maximo.config.settings import OSLC_POST_ASSET_ENDPOINT
 
 logger = logging.getLogger(__name__)
 MAC_SPEC_IDS = {"BAM.MACADRESSE"}
+SKIPPED_ASSETSPEC_IDS = {"BAM.TYPENBEZEICHNUNG"}
 
 
 def _clean_text(value: Any) -> str:
@@ -26,6 +27,10 @@ def _pick_text(data: dict, *keys: str) -> str:
 
 def _is_mac_spec(attrid: str) -> bool:
     return _clean_text(attrid).upper() in MAC_SPEC_IDS
+
+
+def _should_skip_assetspec(attrid: str) -> bool:
+    return _clean_text(attrid).upper() in SKIPPED_ASSETSPEC_IDS
 
 
 def _normalize_mac_address(value: str, attrid: str) -> str:
@@ -47,17 +52,15 @@ def _normalize_mac_address(value: str, attrid: str) -> str:
 
 
 def _build_assetspec(entry: dict) -> list[dict]:
-    merged_specs = {}
-    fixed_specs = entry.get("fixed_specs")
     user_specs = entry.get("user_specs")
-    if isinstance(fixed_specs, dict):
-        merged_specs.update(fixed_specs)
-    if isinstance(user_specs, dict):
-        merged_specs.update(user_specs)
+    if not isinstance(user_specs, dict):
+        return []
 
     assetspec = []
     classstructureid = _pick_text(entry, "classstructureid")
-    for attrid, value in merged_specs.items():
+    for attrid, value in user_specs.items():
+        if _should_skip_assetspec(attrid):
+            continue
         if value in (None, ""):
             continue
         if _is_mac_spec(attrid):
@@ -131,10 +134,6 @@ def _build_payload(entry: dict) -> dict:
     if itemsetid:
         payload["spi:itemsetid"] = itemsetid
 
-    classstructureid = _pick_text(entry, "classstructureid")
-    if classstructureid:
-        payload["spi:classstructureid"] = classstructureid
-
     persongroup = _pick_text(
         entry,
         "group",
@@ -157,6 +156,10 @@ def _build_payload(entry: dict) -> dict:
     assetspec = _build_assetspec(entry)
     if assetspec:
         payload["spi:assetspec"] = assetspec
+
+    classstructureid = _pick_text(entry, "classstructureid")
+    if classstructureid and not assetspec:
+        payload["spi:classstructureid"] = classstructureid
 
     assetusercust = _build_assetusercust(entry)
     if assetusercust:
