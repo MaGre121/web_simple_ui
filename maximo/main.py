@@ -1,6 +1,8 @@
 from maximo.config import settings
 from maximo.oslc.assets import fetch_assets_for_location, add_asset
 from maximo.oslc.fetch_templates import fetch_templates, save_templates
+from maximo.oslc.fetch_projects import fetch_projects, save_projects
+from maximo.oslc.fetch_users import fetch_users, save_users
 from maximo.oslc.session import load_environment, create_session
 from maximo.oslc.fetch import fetch_all_oslc
 from maximo.model.location_tree import build_flat_structure, build_tree, prune_tree
@@ -63,6 +65,13 @@ def main():
     # settings.CACHE_TREE_FILE.write_text(json.dumps(asset_tree, indent=2))
     # export_firmengelaende(asset_tree, 2, settings.LOC_AREA_DIR)
     # add_asset(server, session, "BOR14900","asdf1234", "aa:bb:cc:dd:ee")
+    # Nutzer holen
+    users = fetch_users(server, session)
+    save_users(users)
+    # Projekte holen
+    projects = fetch_projects(server, session)
+    save_projects(projects)
+    # master Items holen
     templates = fetch_templates(server, session)
     save_templates(templates)
 
