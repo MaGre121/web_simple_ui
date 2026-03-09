@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import Body, FastAPI, HTTPException, Request, Response, status
+from fastapi import Body, FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, JSONResponse
 
 from maximo.config import settings
@@ -23,6 +23,14 @@ def _clean_text(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def _pick_text(data: dict, *keys: str) -> str:
+    for key in keys:
+        value = _clean_text(data.get(key))
+        if value:
+            return value
+    return ""
 
 
 def _is_mac_spec(spec_name: str) -> bool:
@@ -100,6 +108,9 @@ def _normalize_users(users: Any) -> list[dict]:
 
 
 def _validate_entry(payload: dict) -> dict:
+    projekt = _pick_text(payload, "projekt", "projektcode", "cxprojekt", "cxprojektid")
+    projektcode = _pick_text(payload, "projektcode", "projekt", "cxprojekt", "cxprojektid")
+
     entry = {
         "itemnum": _clean_text(payload.get("itemnum")),
         "description": _clean_text(payload.get("description")),
@@ -108,8 +119,11 @@ def _validate_entry(payload: dict) -> dict:
         "classstructureid": _clean_text(payload.get("classstructureid")),
         "location": _clean_text(payload.get("location")),
         "serialnum": _clean_text(payload.get("serialnum")),
-        "projekt": _clean_text(payload.get("projekt")),
-        "users": _normalize_users(payload.get("users")),
+        "projekt": projekt,
+        "projektcode": projektcode,
+        "cxprojektid": _pick_text(payload, "cxprojektid"),
+        "group": _pick_text(payload, "group", "cxpersongroup", "persongroup"),
+        "users": _normalize_users(payload.get("users") if payload.get("users") is not None else payload.get("user_secs")),
         "fixed_specs": _normalize_specs(payload.get("fixed_specs"), "fixed_specs"),
         "user_specs": _normalize_specs(payload.get("user_specs"), "user_specs"),
     }
@@ -372,16 +386,13 @@ def get_queue():
 @app.post("/api/queue")
 def add_queue_entry(payload: dict = Body(...)):
     entry = _validate_entry(payload)
-    queue = _load_queue_or_http_error()
-    updated_queue = add_to_queue(queue, entry)
-    save_queue(updated_queue)
-    return JSONResponse(updated_queue, status_code=status.HTTP_201_CREATED)
+    add_to_queue(entry)
+    return JSONResponse(_load_queue_or_http_error(), status_code=status.HTTP_201_CREATED)
 
 
 @app.delete("/api/queue/{entry_id}")
 def delete_queue_entry(entry_id: str):
-    queue = _load_queue_or_http_error()
-    removed = remove_from_queue(queue, entry_id)
+    removed = remove_from_queue(entry_id)
 
     if not removed:
         raise HTTPException(
@@ -389,7 +400,7 @@ def delete_queue_entry(entry_id: str):
             detail=f"Queue-Eintrag nicht gefunden: {entry_id}",
         )
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return JSONResponse(_load_queue_or_http_error())
 
 
 @app.post("/api/upload")

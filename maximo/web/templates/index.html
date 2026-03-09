@@ -722,9 +722,10 @@ function makeRoleCheck(label, checked, onChange) {
 
 /* ── status chip ── */
 function createStatusChip(s) {
+  const normalized = s === "ok" ? "success" : (s || "pending");
   const chip = document.createElement("span");
-  chip.className = "status-chip " + (s === "ok" ? "ok" : s === "error" ? "error" : "pending");
-  chip.textContent = s || "pending";
+  chip.className = "status-chip " + (normalized === "success" ? "ok" : normalized === "error" ? "error" : "pending");
+  chip.textContent = normalized;
   return chip;
 }
 
@@ -744,7 +745,7 @@ function renderQueue() {
     return;
   }
   const pending = q.filter(function(e) { return e.status === "pending"; }).length;
-  const ok = q.filter(function(e) { return e.status === "ok"; }).length;
+  const ok = q.filter(function(e) { return e.status === "success" || e.status === "ok"; }).length;
   const err = q.filter(function(e) { return e.status === "error"; }).length;
   queueSummary.textContent = q.length + " Eintraege — " + pending + " ausstehend, " + ok + " OK, " + err + " Fehler";
 
@@ -773,7 +774,7 @@ function renderQueue() {
     actionCell.appendChild(delBtn);
 
     row.appendChild(itemCell);
-    row.appendChild(createCell(entry.projektcode, "cell-code"));
+    row.appendChild(createCell(entry.projektcode || entry.projekt, "cell-code"));
     row.appendChild(createCell(entry.location, "cell-code"));
     row.appendChild(createCell(entry.serialnum, "cell-code"));
     row.appendChild(statusCell);
@@ -830,7 +831,8 @@ async function addToQueue(entry) {
 
 async function deleteQueueEntry(id) {
   const res = await fetch("/api/queue/" + id, { method: "DELETE" });
-  const data = await res.json();
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : [];
   if (!res.ok) throw new Error(data.detail || "Loeschen fehlgeschlagen");
   state.queue = data;
   renderQueue();
@@ -851,8 +853,12 @@ async function uploadQueue() {
 /* ── collect entry ── */
 function collectEntry() {
   if (!state.selectedTemplate) throw new Error("Bitte zuerst ein gueltiges Template auswaehlen.");
-  if (!state.selectedProject)  throw new Error("Bitte zuerst ein Projekt auswaehlen.");
-  if (!state.selectedLocation) throw new Error("Bitte zuerst eine Location auswaehlen.");
+
+  const project = findProject(projectInput.value);
+  if (!project) throw new Error("Bitte zuerst ein Projekt auswaehlen.");
+
+  const location = findLocation(locationInput.value);
+  if (!location) throw new Error("Bitte zuerst eine Location auswaehlen.");
 
   const serialEl = assetForm.elements["serialnum"];
   const serialnum = serialEl ? serialEl.value.trim() : "";
@@ -872,18 +878,22 @@ function collectEntry() {
   });
 
   const t = state.selectedTemplate;
-  const p = state.selectedProject;
-  const l = state.selectedLocation;
+  const p = project;
+  const l = location;
+  state.selectedProject = p;
+  state.selectedLocation = l;
 
   return {
     itemnum:          t.itemnum,
     description:      t.description,
-    siteid:           t.siteid,
-    orgid:            t.orgid,
+    siteid:           l.siteid || t.siteid,
+    orgid:            p.orgid || t.orgid,
     classstructureid: t.classstructureid,
     fixed_specs:      t.fixed_specs || {},
     user_specs:       userSpecs,
+    projekt:          p.projektcode || p.cxprojektid || "",
     projektcode:      p.projektcode,
+    cxprojektid:      p.cxprojektid || "",
     location:         l.location,
     serialnum:        serialnum,
     users:            state.assignedUsers.map(function(u) {
