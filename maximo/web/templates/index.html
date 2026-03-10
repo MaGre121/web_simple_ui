@@ -406,9 +406,7 @@ const state = {
   locations: [],
   users: [],
   selectedTemplate: null,
-  selectedProject: null,
-  selectedLocation: null,
-  assignedUsers: [],   // [{personid, isprimary, isuser, iscustodian}]
+  assignedUsers: [],   // [{ personid, isprimary, isuser, iscustodian }]
   queue: [],
   busy: false,
 };
@@ -486,7 +484,7 @@ function buildLocationLabel(l) {
 }
 
 function buildUserLabel(u) {
-  return u.displayname ? u.displayname + " (" + u.personid + ")" : u.personid;
+  return u ? u.personid : "";
 }
 
 /* ── finders ── */
@@ -831,8 +829,7 @@ async function addToQueue(entry) {
 
 async function deleteQueueEntry(id) {
   const res = await fetch("/api/queue/" + id, { method: "DELETE" });
-  const text = await res.text();
-  const data = text ? JSON.parse(text) : [];
+  const data = await res.json();
   if (!res.ok) throw new Error(data.detail || "Loeschen fehlgeschlagen");
   state.queue = data;
   renderQueue();
@@ -880,8 +877,6 @@ function collectEntry() {
   const t = state.selectedTemplate;
   const p = project;
   const l = location;
-  state.selectedProject = p;
-  state.selectedLocation = l;
 
   return {
     itemnum:          t.itemnum,
@@ -892,6 +887,7 @@ function collectEntry() {
     fixed_specs:      t.fixed_specs || {},
     user_specs:       userSpecs,
     projekt:          p.projektcode || p.cxprojektid || "",
+    cxprojekt:        p.projektcode || p.cxprojektid || "",
     projektcode:      p.projektcode,
     cxprojektid:      p.cxprojektid || "",
     location:         l.location,
@@ -931,13 +927,11 @@ templateInput.addEventListener("change", function() {
 
 projectInput.addEventListener("change", function() {
   const found = findProject(projectInput.value);
-  state.selectedProject = found;
   if (found) projectInput.value = buildProjectLabel(found);
 });
 
 locationInput.addEventListener("change", function() {
   const found = findLocation(locationInput.value);
-  state.selectedLocation = found;
   if (found) locationInput.value = buildLocationLabel(found);
 });
 

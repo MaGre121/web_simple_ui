@@ -4,11 +4,12 @@ def fetch_all_oslc(server, session, endpoint, params, max_pages):
     page = 0
 
     while url and page < max_pages:
+        # Follow nextPage links after the first request; they already include paging info.
         response = session.get(
             url,
             headers={"Accept": "application/json"},
             params=params if page == 0 else None,
-            timeout=30
+            timeout=30,
         )
 
         print(f"➡️ Request Seite {page + 1}: {response.status_code}")
@@ -24,8 +25,8 @@ def fetch_all_oslc(server, session, endpoint, params, max_pages):
 
         url = (
             data.get("oslc:responseInfo", {})
-                .get("oslc:nextPage", {})
-                .get("rdf:resource")
+            .get("oslc:nextPage", {})
+            .get("rdf:resource")
         )
         page += 1
 

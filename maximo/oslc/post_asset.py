@@ -1,50 +1,22 @@
 import base64
 import logging
-import re
-from typing import Any
 
 import requests
 
 from maximo.config.settings import OSLC_POST_ASSET_ENDPOINT
+from maximo.normalization import (
+    clean_text as _clean_text,
+    is_mac_spec as _is_mac_spec,
+    normalize_mac_address as _normalize_mac_address,
+    pick_text as _pick_text,
+)
 
 logger = logging.getLogger(__name__)
-MAC_SPEC_IDS = {"BAM.MACADRESSE"}
 SKIPPED_ASSETSPEC_IDS = {"BAM.TYPENBEZEICHNUNG"}
-
-
-def _clean_text(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
-
-
-def _pick_text(data: dict, *keys: str) -> str:
-    for key in keys:
-        value = _clean_text(data.get(key))
-        if value:
-            return value
-    return ""
-
-
-def _is_mac_spec(attrid: str) -> bool:
-    return _clean_text(attrid).upper() in MAC_SPEC_IDS
 
 
 def _should_skip_assetspec(attrid: str) -> bool:
     return _clean_text(attrid).upper() in SKIPPED_ASSETSPEC_IDS
-
-
-def _normalize_mac_address(value: str, attrid: str) -> str:
-    cleaned_value = _clean_text(value)
-    if not cleaned_value:
-        return ""
-    compact_value = re.sub(r"[\s.:-]+", "", cleaned_value)
-    if not re.fullmatch(r"[0-9A-Fa-f]{12}", compact_value):
-        raise ValueError(
-            f"Ungueltige MAC-Adresse fuer {attrid}: erwartet NN:NN:NN:NN:NN:NN"
-        )
-    compact_value = compact_value.upper()
-    return ":".join(compact_value[i:i + 2] for i in range(0, 12, 2))
 
 
 def _build_create_payload(entry: dict) -> dict:
@@ -55,11 +27,11 @@ def _build_create_payload(entry: dict) -> dict:
         if value:
             payload[field] = value
 
-    persongroup = _pick_text(entry, "group")
+    persongroup = _pick_text(entry, "group", "cxpersongroup", "persongroup")
     if persongroup:
         payload["cxpersongroup"] = persongroup
 
-    projekt = _pick_text(entry, "cxprojekt")
+    projekt = _pick_text(entry, "cxprojekt", "projekt", "projektcode", "cxprojektid")
     if projekt:
         payload["cxprojekt"] = projekt
 
@@ -83,22 +55,35 @@ def _build_create_payload(entry: dict) -> dict:
     return payload
 
 
+def _collect_specs(entry: dict) -> dict[str, str]:
+    collected: dict[str, str] = {}
+
+    for key in ("fixed_specs", "user_specs"):
+        specs = entry.get(key)
+        if not isinstance(specs, dict):
+            continue
+
+        for attrid, value in specs.items():
+            cleaned_attrid = _clean_text(attrid)
+            cleaned_value = _clean_text(value)
+
+            if not cleaned_attrid or not cleaned_value:
+                continue
+            if _should_skip_assetspec(cleaned_attrid):
+                continue
+            if _is_mac_spec(cleaned_attrid):
+                cleaned_value = _normalize_mac_address(cleaned_value, cleaned_attrid)
+
+            collected[cleaned_attrid] = cleaned_value
+
+    return collected
+
+
 def _build_spec_payload(entry: dict) -> list[dict]:
-    user_specs = entry.get("user_specs")
-    if not isinstance(user_specs, dict):
-        return []
-
     specs = []
-    for attrid, value in user_specs.items():
-        if _should_skip_assetspec(attrid):
-            continue
-        if value in (None, ""):
-            continue
-        if _is_mac_spec(attrid):
-            value = _normalize_mac_address(value, attrid)
-
+    for attrid, value in _collect_specs(entry).items():
         row = {
-            "assetattrid": _clean_text(attrid),
+            "assetattrid": attrid,
             "alnvalue": value,
         }
         specs.append(row)
@@ -176,14 +161,13 @@ def _update_specs(
     server: str,
     session,
     assetnum: str,
-    entry: dict,
+    siteid: str,
+    specs: list[dict],
     asset_uri: str = "",
 ) -> None:
-    specs = _build_spec_payload(entry)
     if not specs:
         return
 
-    siteid = _pick_text(entry, "siteid")
     if assetnum and siteid:
         url = _asset_href(server, assetnum, siteid)
     else:
@@ -227,7 +211,11 @@ def post_asset(server: str, session, entry: dict) -> dict:
     try:
         payload = _build_create_payload(entry)
     except ValueError as exc:
-        logger.error("Asset POST abgebrochen item=%s error=%s", entry.get("itemnum"), exc)
+        logger.error(
+            "Asset POST abgebrochen item=%s error=%s",
+            entry.get("itemnum"),
+            exc,
+        )
         return {"success": False, "error": str(exc)}
 
     url = f"{server}{OSLC_POST_ASSET_ENDPOINT}?lean=1"
@@ -250,25 +238,35 @@ def post_asset(server: str, session, entry: dict) -> dict:
 
     if not response.ok:
         error = _extract_error(response)
-        logger.error("Maximo POST fehlgeschlagen item=%s status=%s error=%s",
-                      entry.get("itemnum"), response.status_code, error)
+        logger.error(
+            "Maximo POST fehlgeschlagen item=%s status=%s error=%s",
+            entry.get("itemnum"),
+            response.status_code,
+            error,
+        )
         return {"success": False, "error": error}
 
     assetnum = _extract_assetnum(response)
     asset_uri = _extract_resource_uri(response)
+    specs = _build_spec_payload(entry)
 
-    if entry.get("user_specs") and (assetnum or asset_uri):
+    # Create the asset first, then merge specs so we do not replace existing rows.
+    if specs and (assetnum or asset_uri):
         try:
             _update_specs(
                 server,
                 session,
                 assetnum,
-                entry,
+                _pick_text(entry, "siteid"),
+                specs,
                 asset_uri=asset_uri,
             )
         except (RuntimeError, ValueError) as exc:
-            logger.error("Asset erstellt, Spec-Update fehlgeschlagen item=%s error=%s",
-                          entry.get("itemnum"), exc)
+            logger.error(
+                "Asset erstellt, Spec-Update fehlgeschlagen item=%s error=%s",
+                entry.get("itemnum"),
+                exc,
+            )
             return {"success": False, "error": str(exc), "assetnum": assetnum}
 
     return {"success": True, "assetnum": assetnum}

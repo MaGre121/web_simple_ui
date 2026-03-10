@@ -1,13 +1,8 @@
-from maximo.config.settings import GET_ASSETS
-from maximo.oslc.assets import fetch_assets_for_location
-import logging
-logger = logging.getLogger(__name__)
-
-
 def build_flat_structure(
     locations: list,
-    assets: dict,
+    assets: dict | None = None,
 ) -> dict:
+    assets = assets or {}
     flat = {}
 
     for loc in locations:
@@ -26,10 +21,11 @@ def build_flat_structure(
             "siteid": loc.get("spi:siteid"),
             "parent": parent,
             "children": {},
-            "assets": assets.get(loc_id, {})  # populated later (if needed)
+            "assets": assets.get(loc_id, {}),
         }
 
     return flat
+
 
 def build_tree(flat: dict) -> dict:
     tree = {}
@@ -43,11 +39,9 @@ def build_tree(flat: dict) -> dict:
 
     return tree
 
-def _prune_empty_locations(node: dict) -> bool:
-    """
-    Returns True if node should be kept
-    """
 
+def _prune_empty_locations(node: dict) -> bool:
+    # Keep parents when they still contain child nodes with assets.
     children = node.get("children", {})
     to_delete = []
 
@@ -63,6 +57,7 @@ def _prune_empty_locations(node: dict) -> bool:
 
     return has_assets or has_children
 
+
 def prune_tree(tree: dict) -> dict:
     pruned = {}
 
@@ -71,5 +66,4 @@ def prune_tree(tree: dict) -> dict:
             pruned[loc_id] = node
 
     return pruned
-
 

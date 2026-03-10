@@ -1,7 +1,10 @@
 import os
+
 import requests
 from dotenv import load_dotenv
+
 from maximo.config.settings import ENV_PATH
+
 
 def load_environment():
     load_dotenv(dotenv_path=ENV_PATH)

@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -10,52 +9,18 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from maximo.config import settings
 from maximo.model.queue import add_to_queue, load_queue, remove_from_queue, save_queue
+from maximo.normalization import (
+    clean_text as _clean_text,
+    is_mac_spec as _is_mac_spec,
+    normalize_mac_address,
+    pick_text as _pick_text,
+)
 from maximo.oslc.post_asset import post_asset
 from maximo.oslc.session import create_session, load_environment
 
 logger = logging.getLogger(__name__)
 
 INDEX_FILE = Path(__file__).resolve().parent / "templates" / "index.html"
-MAC_SPEC_IDS = {"BAM.MACADRESSE"}
-
-
-def _clean_text(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
-
-
-def _pick_text(data: dict, *keys: str) -> str:
-    for key in keys:
-        value = _clean_text(data.get(key))
-        if value:
-            return value
-    return ""
-
-
-def _is_mac_spec(spec_name: str) -> bool:
-    return _clean_text(spec_name).upper() in MAC_SPEC_IDS
-
-
-def _normalize_mac_address(value: Any, field_label: str) -> str:
-    cleaned_value = _clean_text(value)
-    if not cleaned_value:
-        return ""
-
-    compact_value = re.sub(r"[\s.:-]+", "", cleaned_value)
-    if not re.fullmatch(r"[0-9A-Fa-f]{12}", compact_value):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Ungueltige MAC-Adresse fuer {field_label}: "
-                "erwartet NN:NN:NN:NN:NN:NN"
-            ),
-        )
-
-    compact_value = compact_value.upper()
-    return ":".join(
-        compact_value[i:i + 2] for i in range(0, len(compact_value), 2)
-    )
 
 
 def _normalize_specs(specs: Any, label: str) -> dict[str, str]:
@@ -75,7 +40,13 @@ def _normalize_specs(specs: Any, label: str) -> dict[str, str]:
 
         cleaned_value = _clean_text(value)
         if _is_mac_spec(cleaned_key):
-            cleaned_value = _normalize_mac_address(cleaned_value, cleaned_key)
+            try:
+                cleaned_value = normalize_mac_address(cleaned_value, cleaned_key)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(exc),
+                ) from exc
 
         normalized[cleaned_key] = cleaned_value
 
@@ -108,7 +79,8 @@ def _normalize_users(users: Any) -> list[dict]:
 
 
 def _validate_entry(payload: dict) -> dict:
-    projekt = _pick_text(payload, "projekt", "projektcode", "cxprojekt", "cxprojektid")
+    # Keep the legacy aliases so existing queue entries stay uploadable.
+    projekt = _pick_text(payload, "cxprojekt", "projekt", "projektcode", "cxprojektid")
     projektcode = _pick_text(payload, "projektcode", "projekt", "cxprojekt", "cxprojektid")
 
     entry = {
@@ -120,10 +92,15 @@ def _validate_entry(payload: dict) -> dict:
         "location": _clean_text(payload.get("location")),
         "serialnum": _clean_text(payload.get("serialnum")),
         "projekt": projekt,
+        "cxprojekt": projekt,
         "projektcode": projektcode,
         "cxprojektid": _pick_text(payload, "cxprojektid"),
         "group": _pick_text(payload, "group", "cxpersongroup", "persongroup"),
-        "users": _normalize_users(payload.get("users") if payload.get("users") is not None else payload.get("user_secs")),
+        "users": _normalize_users(
+            payload.get("users")
+            if payload.get("users") is not None
+            else payload.get("user_secs")
+        ),
         "fixed_specs": _normalize_specs(payload.get("fixed_specs"), "fixed_specs"),
         "user_specs": _normalize_specs(payload.get("user_specs"), "user_specs"),
     }
@@ -338,6 +315,7 @@ async def lifespan(app: FastAPI):
     app.state.startup_error = None
 
     try:
+        # The office UI reuses one Maximo session for the lifetime of the app.
         server, token = load_environment()
         session = create_session(token)
         app.state.server = server
@@ -426,6 +404,7 @@ def upload_queue(request: Request):
         if current_status == "success":
             continue
 
+        # Keep processing later rows even if one upload fails.
         result = post_asset(
             request.app.state.server,
             request.app.state.session,
