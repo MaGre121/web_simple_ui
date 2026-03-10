@@ -35,10 +35,6 @@ def _build_create_payload(entry: dict) -> dict:
     if projekt:
         payload["cxprojekt"] = projekt
 
-    classstructureid = _pick_text(entry, "classstructureid")
-    if classstructureid:
-        payload["classstructureid"] = classstructureid
-
     users = entry.get("users")
     if isinstance(users, list) and users:
         payload["assetusercust"] = [
@@ -111,7 +107,7 @@ def _asset_href(server: str, assetnum: str, siteid: str) -> str:
     raw = f"{assetnum}/{siteid}"
     b64 = base64.b64encode(raw.encode()).decode().rstrip("=")
     b64 = b64.replace("+", "-").replace("/", "_")
-    return f"{server}{OSLC_POST_ASSET_ENDPOINT}/_{b64}-"
+    return f"{server.rstrip('/')}/{OSLC_POST_ASSET_ENDPOINT}/_{b64}-"
 
 
 def _decode_asset_href(resource_uri: str) -> tuple[str, str]:

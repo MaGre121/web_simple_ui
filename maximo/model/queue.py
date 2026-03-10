@@ -12,6 +12,15 @@ def _ensure_queue_file() -> None:
         CACHE_QUEUE_FILE.write_text("[]\n", encoding="utf-8")
 
 
+def _normalize_queue_entry(entry):
+    if not isinstance(entry, dict):
+        return entry
+
+    normalized = deepcopy(entry)
+    normalized.pop("classstructureid", None)
+    return normalized
+
+
 def load_queue() -> list[dict]:
     _ensure_queue_file()
 
@@ -23,20 +32,25 @@ def load_queue() -> list[dict]:
     if not isinstance(queue, list):
         raise RuntimeError("queue.json muss ein JSON-Array enthalten")
 
-    return queue
+    normalized_queue = [_normalize_queue_entry(entry) for entry in queue]
+    if normalized_queue != queue:
+        save_queue(normalized_queue)
+
+    return normalized_queue
 
 
 def save_queue(queue: list[dict]) -> None:
     _ensure_queue_file()
+    normalized_queue = [_normalize_queue_entry(entry) for entry in queue]
     CACHE_QUEUE_FILE.write_text(
-        json.dumps(queue, indent=2, ensure_ascii=False) + "\n",
+        json.dumps(normalized_queue, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
 
 
 def add_to_queue(entry: dict) -> dict:
     # Keep the caller's dict untouched before queue metadata is added.
-    stored_entry = deepcopy(entry)
+    stored_entry = _normalize_queue_entry(entry)
     stored_entry["id"] = str(uuid4())
     stored_entry["status"] = "pending"
 

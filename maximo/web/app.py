@@ -88,7 +88,6 @@ def _validate_entry(payload: dict) -> dict:
         "description": _clean_text(payload.get("description")),
         "siteid": _clean_text(payload.get("siteid")),
         "orgid": _clean_text(payload.get("orgid")),
-        "classstructureid": _clean_text(payload.get("classstructureid")),
         "location": _clean_text(payload.get("location")),
         "serialnum": _clean_text(payload.get("serialnum")),
         "projekt": projekt,
