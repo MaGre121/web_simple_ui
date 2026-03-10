@@ -1,3 +1,4 @@
+import base64
 import logging
 import re
 from typing import Any
@@ -87,7 +88,6 @@ def _build_spec_payload(entry: dict) -> list[dict]:
     if not isinstance(user_specs, dict):
         return []
 
-    classstructureid = _pick_text(entry, "classstructureid")
     specs = []
     for attrid, value in user_specs.items():
         if _should_skip_assetspec(attrid):
@@ -101,11 +101,48 @@ def _build_spec_payload(entry: dict) -> list[dict]:
             "assetattrid": _clean_text(attrid),
             "alnvalue": value,
         }
-        if classstructureid:
-            row["classstructureid"] = classstructureid
         specs.append(row)
 
     return specs
+
+
+def _extract_resource_uri(response: requests.Response) -> str:
+    return _clean_text(
+        response.headers.get("Location") or response.headers.get("location")
+    )
+
+
+def _normalize_resource_uri(server: str, resource_uri: str) -> str:
+    if not resource_uri:
+        return ""
+    if resource_uri.startswith("http://") or resource_uri.startswith("https://"):
+        return resource_uri
+    if resource_uri.startswith("/"):
+        return f"{server}{resource_uri}"
+    return f"{server}/{resource_uri}"
+
+
+def _asset_href(server: str, assetnum: str, siteid: str) -> str:
+    raw = f"{assetnum}/{siteid}"
+    b64 = base64.b64encode(raw.encode()).decode().rstrip("=")
+    b64 = b64.replace("+", "-").replace("/", "_")
+    return f"{server}{OSLC_POST_ASSET_ENDPOINT}/_{b64}-"
+
+
+def _decode_asset_href(resource_uri: str) -> tuple[str, str]:
+    segment = _clean_text(resource_uri).rstrip("/").split("/")[-1]
+    if not (segment.startswith("_") and segment.endswith("-")):
+        return "", ""
+
+    encoded = segment[1:-1].replace("-", "+").replace("_", "/")
+    padding = "=" * (-len(encoded) % 4)
+    try:
+        raw = base64.b64decode(encoded + padding).decode()
+    except Exception:
+        return "", ""
+
+    assetnum, _, siteid = raw.partition("/")
+    return _clean_text(assetnum), _clean_text(siteid)
 
 
 def _extract_assetnum(response: requests.Response) -> str:
@@ -115,9 +152,12 @@ def _extract_assetnum(response: requests.Response) -> str:
             return _pick_text(data, "assetnum")
     except ValueError:
         pass
-    return _clean_text(
-        response.headers.get("Location", "")
-    ).rstrip("/").split("/")[-1].split("?")[0]
+
+    assetnum, _ = _decode_asset_href(_extract_resource_uri(response))
+    if assetnum:
+        return assetnum
+
+    return _extract_resource_uri(response).rstrip("/").split("/")[-1].split("?")[0]
 
 
 def _extract_error(response: requests.Response) -> str:
@@ -132,33 +172,54 @@ def _extract_error(response: requests.Response) -> str:
     return f"HTTP {response.status_code}"
 
 
-def _update_specs(server: str, session, assetnum: str, entry: dict) -> None:
+def _update_specs(
+    server: str,
+    session,
+    assetnum: str,
+    entry: dict,
+    asset_uri: str = "",
+) -> None:
     specs = _build_spec_payload(entry)
     if not specs:
         return
 
     siteid = _pick_text(entry, "siteid")
-    url = (
-        f"{server}{OSLC_POST_ASSET_ENDPOINT}"
-        f"?lean=1"
-        f"&oslc.where=assetnum=%22{assetnum}%22 and siteid=%22{siteid}%22"
-    )
+    if assetnum and siteid:
+        url = _asset_href(server, assetnum, siteid)
+    else:
+        url = _normalize_resource_uri(server, asset_uri)
+        if not url:
+            raise RuntimeError("Asset-URL fuer Spec-Update konnte nicht bestimmt werden")
 
-    response = session.patch(
+    payload = {
+        "spi:assetspec": [
+            {
+                "spi:assetattrid": spec["assetattrid"],
+                "spi:linearassetspecid": 0,
+                "spi:alnvalue": spec["alnvalue"],
+            }
+            for spec in specs
+        ]
+    }
+
+    response = session.post(
         url,
-        json={"assetspec": specs},
+        json=payload,
         headers={
             "Content-Type": "application/json",
             "Accept": "application/json",
             "x-method-override": "PATCH",
-            "patchtype": "MERGE",
+            "PATCHTYPE": "MERGE",
+            "properties": "assetspec",
+            "x-public-uri": server,
         },
         timeout=30,
     )
 
-    if not response.ok:
+    if response.status_code != 200:
         raise RuntimeError(
-            f"Spec-Update fehlgeschlagen fuer {assetnum}: {_extract_error(response)}"
+            f"Spec-Update fehlgeschlagen fuer {assetnum}: "
+            f"{response.status_code} {response.text[:500]}"
         )
 
 
@@ -179,6 +240,7 @@ def post_asset(server: str, session, entry: dict) -> dict:
                 "Content-Type": "application/json",
                 "Accept": "application/json",
                 "properties": "assetnum",
+                "x-public-uri": server,
             },
             timeout=30,
         )
@@ -193,10 +255,17 @@ def post_asset(server: str, session, entry: dict) -> dict:
         return {"success": False, "error": error}
 
     assetnum = _extract_assetnum(response)
+    asset_uri = _extract_resource_uri(response)
 
-    if entry.get("user_specs") and assetnum:
+    if entry.get("user_specs") and (assetnum or asset_uri):
         try:
-            _update_specs(server, session, assetnum, entry)
+            _update_specs(
+                server,
+                session,
+                assetnum,
+                entry,
+                asset_uri=asset_uri,
+            )
         except (RuntimeError, ValueError) as exc:
             logger.error("Asset erstellt, Spec-Update fehlgeschlagen item=%s error=%s",
                           entry.get("itemnum"), exc)
