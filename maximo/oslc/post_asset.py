@@ -78,6 +78,159 @@ def _build_assetspec(entry: dict) -> list[dict]:
     return assetspec
 
 
+def _extract_resource_uri(response: requests.Response) -> str:
+    return _clean_text(
+        response.headers.get("Location") or response.headers.get("location")
+    )
+
+
+def _normalize_resource_uri(server: str, resource_uri: str) -> str:
+    if not resource_uri:
+        return ""
+    if resource_uri.startswith("http://") or resource_uri.startswith("https://"):
+        return resource_uri
+    if resource_uri.startswith("/"):
+        return f"{server}{resource_uri}"
+    return f"{server}/{resource_uri}"
+
+
+def _get_asset_response(server: str, session, asset_uri: str) -> requests.Response:
+    url = _normalize_resource_uri(server, asset_uri)
+    if not url:
+        raise RuntimeError("Kein Asset-URI aus dem Create-Response erhalten")
+    return session.get(
+        url,
+        headers={
+            "Accept": "application/json",
+            "x-public-uri": server,
+        },
+        params={
+            "lean": 1,
+            "oslc.select": (
+                "assetnum,"
+                "assetspec{assetattrid,alnvalue,classstructureid,"
+                "section,linearassetspecid,href,localuri}"
+            ),
+        },
+        timeout=30,
+    )
+
+
+def _extract_assetnum_from_asset(data: dict) -> str:
+    return _pick_text(data, "spi:assetnum", "assetnum")
+
+
+def _extract_assetspec_rows(asset: dict) -> list[dict]:
+    rows = asset.get("spi:assetspec")
+    if isinstance(rows, list):
+        return rows
+
+    rows = asset.get("assetspec")
+    if isinstance(rows, list):
+        return rows
+
+    return []
+
+
+def _build_assetspec_update_rows(asset: dict, entry: dict) -> list[dict]:
+    assetnum = _extract_assetnum_from_asset(asset)
+    siteid = _pick_text(asset, "spi:siteid", "siteid") or _pick_text(entry, "siteid")
+    existing_rows = {}
+    for row in _extract_assetspec_rows(asset):
+        if not isinstance(row, dict):
+            continue
+        attrid = _pick_text(row, "spi:assetattrid", "assetattrid")
+        if not attrid:
+            continue
+        existing_rows[attrid.upper()] = row
+
+    updates = []
+    for spec_entry in _build_assetspec(entry):
+        attrid = _pick_text(spec_entry, "spi:assetattrid", "assetattrid")
+        row = existing_rows.get(attrid.upper())
+        if row is None:
+            raise ValueError(
+                f"Spec nicht gefunden nach Asset-Create: {attrid}"
+            )
+
+        update_row = {
+            "spi:assetattrid": attrid,
+            "spi:alnvalue": spec_entry["spi:alnvalue"],
+        }
+
+        href = _pick_text(row, "href", "localuri")
+        if href:
+            update_row["href"] = href
+        else:
+            if assetnum:
+                update_row["spi:assetnum"] = assetnum
+            if siteid:
+                update_row["spi:siteid"] = siteid
+
+            section = _pick_text(row, "spi:section", "section")
+            if section:
+                update_row["spi:section"] = section
+
+            linearassetspecid = _pick_text(
+                row,
+                "spi:linearassetspecid",
+                "linearassetspecid",
+            )
+            if linearassetspecid:
+                update_row["spi:linearassetspecid"] = linearassetspecid
+
+        updates.append(update_row)
+
+    return updates
+
+
+def _update_asset_specs(server: str, session, asset_uri: str, entry: dict) -> str:
+    get_response = _get_asset_response(server, session, asset_uri)
+    if not get_response.ok:
+        raise RuntimeError(
+            "Asset wurde erstellt, konnte aber fuer Spec-Update nicht geladen werden: "
+            f"{_extract_error(get_response)}"
+        )
+
+    try:
+        asset = get_response.json()
+    except ValueError as exc:
+        raise RuntimeError(
+            "Asset wurde erstellt, aber die GET-Antwort fuer das Spec-Update war kein JSON"
+        ) from exc
+
+    assetnum = _extract_assetnum_from_asset(asset)
+    updates = _build_assetspec_update_rows(asset, entry)
+    if not updates:
+        return assetnum
+
+    patch_response = session.post(
+        _normalize_resource_uri(server, asset_uri),
+        json={"spi:assetspec": updates},
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "x-public-uri": server,
+            "x-method-override": "PATCH",
+            "patchtype": "MERGE",
+            "properties": "assetnum",
+        },
+        timeout=30,
+    )
+    if not patch_response.ok:
+        raise RuntimeError(_extract_error(patch_response))
+
+    if not assetnum:
+        try:
+            patch_data = patch_response.json()
+        except ValueError:
+            patch_data = None
+        if isinstance(patch_data, dict):
+            assetnum = _extract_assetnum_from_asset(patch_data)
+
+    return assetnum
+
+
 def _build_assetusercust(entry: dict) -> list[dict]:
     users = entry.get("users")
     if not isinstance(users, list):
@@ -106,7 +259,7 @@ def _build_assetusercust(entry: dict) -> list[dict]:
     return assetusercust
 
 
-def _build_payload(entry: dict) -> dict:
+def _build_create_payload(entry: dict) -> dict:
     payload = {}
 
     required_fields = {
@@ -153,12 +306,8 @@ def _build_payload(entry: dict) -> dict:
     if project:
         payload["spi:cxprojekt"] = project
 
-    assetspec = _build_assetspec(entry)
-    if assetspec:
-        payload["spi:assetspec"] = assetspec
-
     classstructureid = _pick_text(entry, "classstructureid")
-    if classstructureid and not assetspec:
+    if classstructureid:
         payload["spi:classstructureid"] = classstructureid
 
     assetusercust = _build_assetusercust(entry)
@@ -223,7 +372,7 @@ def _extract_error(response: requests.Response) -> str:
 
 def post_asset(server: str, session, entry: dict) -> dict:
     try:
-        payload = _build_payload(entry)
+        payload = _build_create_payload(entry)
     except ValueError as exc:
         logger.error(
             "Asset POST abgebrochen fuer item=%s error=%s",
@@ -242,6 +391,7 @@ def post_asset(server: str, session, entry: dict) -> dict:
                 "Content-Type": "application/json",
                 "Accept": "application/json",
                 "x-public-uri": server,
+                "properties": "assetnum",
             },
             timeout=30,
         )
@@ -259,6 +409,7 @@ def post_asset(server: str, session, entry: dict) -> dict:
         )
         return {"success": False, "error": error}
 
+    asset_uri = _extract_resource_uri(response)
     assetnum = ""
     try:
         data = response.json()
@@ -267,6 +418,25 @@ def post_asset(server: str, session, entry: dict) -> dict:
 
     if isinstance(data, dict):
         assetnum = _extract_assetnum_from_json(data)
+
+    if entry.get("user_specs"):
+        try:
+            updated_assetnum = _update_asset_specs(server, session, asset_uri, entry)
+        except RuntimeError as exc:
+            logger.error(
+                "Asset erstellt, aber Spec-Update fehlgeschlagen fuer item=%s error=%s",
+                entry.get("itemnum"),
+                exc,
+            )
+            if not assetnum:
+                assetnum = _extract_assetnum_from_headers(response)
+            result = {"success": False, "error": str(exc)}
+            if assetnum:
+                result["assetnum"] = assetnum
+            return result
+
+        if updated_assetnum:
+            assetnum = updated_assetnum
 
     if not assetnum:
         assetnum = _extract_assetnum_from_headers(response)
