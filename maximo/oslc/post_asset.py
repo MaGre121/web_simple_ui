@@ -9,6 +9,11 @@ from maximo.config.settings import OSLC_POST_ASSET_ENDPOINT
 logger = logging.getLogger(__name__)
 MAC_SPEC_IDS = {"BAM.MACADRESSE"}
 SKIPPED_ASSETSPEC_IDS = {"BAM.TYPENBEZEICHNUNG"}
+ASSET_READ_SELECT = (
+    "assetnum,siteid,"
+    "assetspec{assetattrid,alnvalue,classstructureid,"
+    "section,linearassetspecid,href,localuri}"
+)
 
 
 def _clean_text(value: Any) -> str:
@@ -106,11 +111,33 @@ def _get_asset_response(server: str, session, asset_uri: str) -> requests.Respon
         },
         params={
             "lean": 1,
-            "oslc.select": (
-                "assetnum,"
-                "assetspec{assetattrid,alnvalue,classstructureid,"
-                "section,linearassetspecid,href,localuri}"
-            ),
+            "_format": "json",
+            "oslc.format": "application/json",
+            "oslc.select": ASSET_READ_SELECT,
+        },
+        timeout=30,
+    )
+
+
+def _get_asset_lookup_response(
+    server: str,
+    session,
+    assetnum: str,
+    siteid: str,
+) -> requests.Response:
+    return session.get(
+        f"{server}{OSLC_POST_ASSET_ENDPOINT}",
+        headers={
+            "Accept": "application/json",
+            "x-public-uri": server,
+        },
+        params={
+            "lean": 1,
+            "_format": "json",
+            "oslc.format": "application/json",
+            "oslc.where": f'assetnum="{assetnum}" and siteid="{siteid}"',
+            "oslc.select": ASSET_READ_SELECT,
+            "oslc.pageSize": 1,
         },
         timeout=30,
     )
@@ -130,6 +157,42 @@ def _extract_assetspec_rows(asset: dict) -> list[dict]:
         return rows
 
     return []
+
+
+def _extract_asset_from_response(response: requests.Response) -> dict | None:
+    if not response.ok:
+        return None
+
+    if "application/json" not in response.headers.get("Content-Type", ""):
+        return None
+
+    try:
+        data = response.json()
+    except ValueError:
+        return None
+
+    if not isinstance(data, dict):
+        return None
+
+    members = data.get("rdfs:member")
+    if isinstance(members, list):
+        for member in members:
+            if isinstance(member, dict):
+                return member
+        return None
+
+    return data
+
+
+def _describe_response(response: requests.Response) -> str:
+    content_type = _clean_text(response.headers.get("Content-Type"))
+    text = _clean_text(response.text)[:300]
+    if text:
+        return (
+            f"status={response.status_code} content_type={content_type or '-'} "
+            f"body={text}"
+        )
+    return f"status={response.status_code} content_type={content_type or '-'}"
 
 
 def _build_assetspec_update_rows(asset: dict, entry: dict) -> list[dict]:
@@ -184,20 +247,36 @@ def _build_assetspec_update_rows(asset: dict, entry: dict) -> list[dict]:
     return updates
 
 
-def _update_asset_specs(server: str, session, asset_uri: str, entry: dict) -> str:
+def _update_asset_specs(
+    server: str,
+    session,
+    asset_uri: str,
+    entry: dict,
+    assetnum_hint: str = "",
+) -> str:
     get_response = _get_asset_response(server, session, asset_uri)
-    if not get_response.ok:
-        raise RuntimeError(
-            "Asset wurde erstellt, konnte aber fuer Spec-Update nicht geladen werden: "
-            f"{_extract_error(get_response)}"
-        )
+    asset = _extract_asset_from_response(get_response)
+    if asset is None:
+        assetnum = assetnum_hint or _pick_text(entry, "assetnum")
+        siteid = _pick_text(entry, "siteid")
+        lookup_response = None
+        if assetnum and siteid:
+            lookup_response = _get_asset_lookup_response(
+                server,
+                session,
+                assetnum,
+                siteid,
+            )
+            asset = _extract_asset_from_response(lookup_response)
 
-    try:
-        asset = get_response.json()
-    except ValueError as exc:
-        raise RuntimeError(
-            "Asset wurde erstellt, aber die GET-Antwort fuer das Spec-Update war kein JSON"
-        ) from exc
+        if asset is None:
+            details = [
+                "Asset wurde erstellt, aber der Readback fuer das Spec-Update lieferte kein JSON",
+                f"Location-GET: {_describe_response(get_response)}",
+            ]
+            if lookup_response is not None:
+                details.append(f"Collection-GET: {_describe_response(lookup_response)}")
+            raise RuntimeError(" | ".join(details))
 
     assetnum = _extract_assetnum_from_asset(asset)
     updates = _build_assetspec_update_rows(asset, entry)
@@ -421,7 +500,13 @@ def post_asset(server: str, session, entry: dict) -> dict:
 
     if entry.get("user_specs"):
         try:
-            updated_assetnum = _update_asset_specs(server, session, asset_uri, entry)
+            updated_assetnum = _update_asset_specs(
+                server,
+                session,
+                asset_uri,
+                entry,
+                assetnum_hint=assetnum,
+            )
         except RuntimeError as exc:
             logger.error(
                 "Asset erstellt, aber Spec-Update fehlgeschlagen fuer item=%s error=%s",
