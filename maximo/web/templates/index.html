@@ -281,6 +281,16 @@
     .status-chip.error { background: rgba(170,60,60,0.12); color: var(--error); }
     .queue-summary { font-size: 12px; color: var(--muted); padding: 10px 28px; border-top: 1px solid var(--line); }
     .upload-row { padding: 16px 28px; border-top: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
+    .connection-status {
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .connection-status[data-type="info"] { background: rgba(23,32,51,0.06); border-color: rgba(23,32,51,0.08); }
+    .connection-status[data-type="ok"] { background: rgba(40,115,76,0.12); border-color: rgba(40,115,76,0.2); color: #174b31; }
+    .connection-status[data-type="error"] { background: rgba(170,60,60,0.12); border-color: rgba(170,60,60,0.22); color: #7f2626; }
   </style>
 </head>
 <body>
@@ -291,6 +301,33 @@
 </header>
 
 <main>
+
+  <!-- CONNECTION CARD -->
+  <article>
+    <div class="section-header">
+      <div class="section-icon">&#128279;</div>
+      <div class="section-title">Verbindung</div>
+    </div>
+    <div class="section-body">
+      <div class="field-grid">
+        <div class="field">
+          <label for="serverInput">Server</label>
+          <input id="serverInput" type="text" autocomplete="off" spellcheck="false" placeholder="https://company.example">
+          <div class="field-hint">Wird aus `.env` geladen, kann aber direkt im UI geaendert werden.</div>
+        </div>
+        <div class="field">
+          <label for="ltpaTokenInput">LtpaToken2</label>
+          <input id="ltpaTokenInput" type="password" autocomplete="off" spellcheck="false" placeholder="LtpaToken2 ...">
+          <div class="field-hint">Wird fuer Session und Datenabruf verwendet.</div>
+        </div>
+      </div>
+      <div class="button-row">
+        <button id="saveSettingsButton" class="secondary-button" type="button">Verbindung speichern</button>
+        <button id="fetchDataButton" class="primary-button" type="button">Hole Daten</button>
+      </div>
+      <div id="connectionStatus" class="connection-status" data-type="info">Noch keine Verbindung geladen.</div>
+    </div>
+  </article>
 
   <!-- FORM CARD -->
   <article>
@@ -419,6 +456,11 @@ const state = {
 
 /* ── DOM refs ── */
 const messageBox      = document.getElementById("messageBox");
+const serverInput     = document.getElementById("serverInput");
+const ltpaTokenInput  = document.getElementById("ltpaTokenInput");
+const saveSettingsButton = document.getElementById("saveSettingsButton");
+const fetchDataButton = document.getElementById("fetchDataButton");
+const connectionStatus = document.getElementById("connectionStatus");
 const templateInput   = document.getElementById("templateSearch");
 const templateOptions = document.getElementById("templateOptions");
 const projectInput    = document.getElementById("projectSearch");
@@ -456,6 +498,10 @@ function setBusy(val) {
   clearButton.disabled = val;
   uploadButton.disabled = val;
   addUserButton.disabled = val;
+   saveSettingsButton.disabled = val;
+   fetchDataButton.disabled = val;
+   serverInput.disabled = val;
+   ltpaTokenInput.disabled = val;
 }
 
 function norm(v) {
@@ -474,6 +520,49 @@ function normalizeMac(value) {
     throw new Error("Ungueltige MAC-Adresse: erwartet NN:NN:NN:NN:NN:NN");
   }
   return compact.toUpperCase().match(/.{2}/g).join(":");
+}
+
+function renderConnectionStatus(data) {
+  const error = String((data && data.error) || "").trim();
+  const sessionReady = Boolean(data && data.session_ready);
+  let text = "SERVER und LtpaToken2 koennen direkt im UI gesetzt werden.";
+  let type = "info";
+
+  if (sessionReady) {
+    text = "Session bereit fuer " + (data.active_server || data.server || "-");
+    type = "ok";
+  } else if (error) {
+    text = error;
+    type = "error";
+  }
+
+  connectionStatus.textContent = text;
+  connectionStatus.dataset.type = type;
+}
+
+async function readJson(res) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    return { detail: text };
+  }
+}
+
+function apiError(data, fallback) {
+  if (!data) return fallback;
+  if (data.detail) return data.detail;
+  if (data.stderr) return data.stderr;
+  if (data.error) return data.error;
+  return fallback;
+}
+
+function connectionPayload() {
+  return {
+    server: serverInput.value.trim(),
+    ltpa_token2: ltpaTokenInput.value.trim(),
+  };
 }
 
 /* ── label builders ── */
@@ -799,10 +888,10 @@ async function loadData() {
     fetch("/api/users"),
   ]);
 
-  if (!tRes.ok) throw new Error("Templates konnten nicht geladen werden");
-  if (!pRes.ok) throw new Error("Projekte konnten nicht geladen werden");
-  if (!lRes.ok) throw new Error("Locations konnten nicht geladen werden");
-  if (!uRes.ok) throw new Error("Users konnten nicht geladen werden");
+  if (!tRes.ok) throw new Error(apiError(await readJson(tRes), "Templates konnten nicht geladen werden"));
+  if (!pRes.ok) throw new Error(apiError(await readJson(pRes), "Projekte konnten nicht geladen werden"));
+  if (!lRes.ok) throw new Error(apiError(await readJson(lRes), "Locations konnten nicht geladen werden"));
+  if (!uRes.ok) throw new Error(apiError(await readJson(uRes), "Users konnten nicht geladen werden"));
 
   state.templates = await tRes.json();
   state.projects  = await pRes.json();
@@ -813,6 +902,8 @@ async function loadData() {
   populateProjectOptions();
   populateLocationOptions();
   populateUserOptions();
+  state.selectedTemplate = findTemplate(templateInput.value);
+  renderTemplateMeta();
 }
 
 async function loadQueue() {
@@ -820,6 +911,39 @@ async function loadQueue() {
   if (!res.ok) return;
   state.queue = await res.json();
   renderQueue();
+}
+
+async function loadSettings() {
+  const res = await fetch("/api/settings");
+  const data = await readJson(res);
+  if (!res.ok) throw new Error(apiError(data, "Verbindung konnte nicht geladen werden"));
+
+  serverInput.value = data.server || "";
+  ltpaTokenInput.value = data.ltpa_token2 || "";
+  renderConnectionStatus(data);
+}
+
+async function saveSettings() {
+  const res = await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(connectionPayload()),
+  });
+  const data = await readJson(res);
+  if (!res.ok) throw new Error(apiError(data, "Verbindung konnte nicht gespeichert werden"));
+  renderConnectionStatus(data);
+  return data;
+}
+
+async function fetchMasterData() {
+  const res = await fetch("/api/fetch-data", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(connectionPayload()),
+  });
+  const data = await readJson(res);
+  if (!res.ok) throw new Error(apiError(data, "Datenabruf fehlgeschlagen"));
+  return data;
 }
 
 async function addToQueue(entry) {
@@ -995,12 +1119,51 @@ uploadButton.addEventListener("click", async function() {
   }
 });
 
+saveSettingsButton.addEventListener("click", async function() {
+  setBusy(true);
+  showMessage("");
+  try {
+    await saveSettings();
+    showMessage("Verbindung gespeichert.", "ok");
+  } catch (err) {
+    showMessage(err.message, "error");
+    renderConnectionStatus({ error: err.message, session_ready: false });
+  } finally {
+    setBusy(false);
+  }
+});
+
+fetchDataButton.addEventListener("click", async function() {
+  setBusy(true);
+  showMessage("");
+  try {
+    await saveSettings();
+    const result = await fetchMasterData();
+    await loadData();
+    const summary = String(result.stdout || "").trim().split("\n").filter(Boolean).slice(-1)[0];
+    showMessage(
+      summary ? "Daten erfolgreich geladen: " + summary : "Daten erfolgreich geladen.",
+      "ok",
+    );
+  } catch (err) {
+    showMessage(err.message, "error");
+  } finally {
+    setBusy(false);
+  }
+});
+
 /* ── init ── */
 (async function init() {
   setBusy(true);
   try {
-    await loadData();
+    await loadSettings();
     await loadQueue();
+    try {
+      await loadData();
+    } catch (err) {
+      renderTemplateMeta();
+      showMessage("Cache-Daten fehlen oder sind veraltet. Bitte 'Hole Daten' ausfuehren. " + err.message, "info");
+    }
   } catch (err) {
     showMessage("Initialisierung fehlgeschlagen: " + err.message, "error");
   } finally {

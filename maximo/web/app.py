@@ -1,5 +1,7 @@
 import json
 import logging
+import subprocess
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -16,11 +18,63 @@ from maximo.normalization import (
     pick_text as _pick_text,
 )
 from maximo.oslc.post_asset import post_asset
-from maximo.oslc.session import create_session, load_environment
+from maximo.oslc.session import (
+    create_session,
+    load_environment,
+    read_environment,
+    save_environment,
+)
 
 logger = logging.getLogger(__name__)
 
 INDEX_FILE = Path(__file__).resolve().parent / "templates" / "index.html"
+
+
+def _set_session_state(app: FastAPI, server: str, token: str) -> None:
+    cleaned_server = _clean_text(server)
+    cleaned_token = _clean_text(token)
+
+    if not cleaned_server or not cleaned_token:
+        app.state.server = None
+        app.state.session = None
+        app.state.startup_error = "Session-Fehler: SERVER oder MAXIMO_LTPA_TOKEN2 fehlt"
+        return
+
+    app.state.server = cleaned_server
+    app.state.session = create_session(cleaned_token)
+    app.state.startup_error = None
+    logger.info("Maximo-Session initialisiert fuer %s", cleaned_server)
+
+
+def _connection_payload(payload: dict | None = None) -> tuple[str, str]:
+    body = payload or {}
+    saved_server, saved_token = read_environment()
+
+    server = _clean_text(body.get("server")) or saved_server
+    token = _clean_text(
+        body.get("ltpa_token2")
+        or body.get("LtpaToken2")
+        or body.get("MAXIMO_LTPA_TOKEN2")
+    ) or saved_token
+
+    if not server or not token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="SERVER und LtpaToken2 muessen gesetzt sein.",
+        )
+
+    return server, token
+
+
+def _connection_response(app: FastAPI) -> dict[str, Any]:
+    server, token = read_environment()
+    return {
+        "server": server,
+        "ltpa_token2": token,
+        "session_ready": bool(getattr(app.state, "server", None) and app.state.session),
+        "active_server": _clean_text(getattr(app.state, "server", "")),
+        "error": _clean_text(getattr(app.state, "startup_error", "")),
+    }
 
 
 def _normalize_specs(specs: Any, label: str) -> dict[str, str]:
@@ -320,12 +374,8 @@ async def lifespan(app: FastAPI):
     app.state.startup_error = None
 
     try:
-        # The office UI reuses one Maximo session for the lifetime of the app.
         server, token = load_environment()
-        session = create_session(token)
-        app.state.server = server
-        app.state.session = session
-        logger.info("Maximo-Session initialisiert fuer %s", server)
+        _set_session_state(app, server, token)
     except Exception as exc:
         app.state.startup_error = f"Session-Fehler: {exc}"
         logger.error("Startup fehlgeschlagen: %s", exc)
@@ -339,6 +389,19 @@ app = FastAPI(lifespan=lifespan)
 @app.get("/")
 def serve_index():
     return FileResponse(INDEX_FILE)
+
+
+@app.get("/api/settings")
+def get_settings(request: Request):
+    return JSONResponse(_connection_response(request.app))
+
+
+@app.post("/api/settings")
+def save_settings(request: Request, payload: dict = Body(...)):
+    server, token = _connection_payload(payload)
+    save_environment(server, token)
+    _set_session_state(request.app, server, token)
+    return JSONResponse(_connection_response(request.app))
 
 
 @app.get("/api/templates")
@@ -435,3 +498,50 @@ def upload_queue(request: Request):
         save_queue(queue)
 
     return JSONResponse({"queue": queue, "results": results})
+
+
+@app.post("/api/fetch-data")
+def fetch_data(request: Request, payload: dict | None = Body(default=None)):
+    server, token = _connection_payload(payload)
+    save_environment(server, token)
+    _set_session_state(request.app, server, token)
+
+    cmd = [sys.executable, "-m", "maximo.main"]
+    logger.info("Starte Datenabruf: %s", " ".join(cmd))
+
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=str(settings.BASE_DIR),
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return JSONResponse(
+            {
+                "success": False,
+                "stdout": _clean_text(exc.stdout or ""),
+                "stderr": _clean_text(exc.stderr or ""),
+                "detail": "Datenabruf hat das Zeitlimit ueberschritten.",
+            },
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        )
+
+    response = {
+        "success": result.returncode == 0,
+        "returncode": result.returncode,
+        "stdout": _clean_text(result.stdout),
+        "stderr": _clean_text(result.stderr),
+    }
+
+    if result.returncode != 0:
+        return JSONResponse(
+            {
+                **response,
+                "detail": "Datenabruf fehlgeschlagen.",
+            },
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    return JSONResponse(response)
