@@ -99,17 +99,6 @@ def _extract_resource_uri(response: requests.Response) -> str:
         response.headers.get("Location") or response.headers.get("location")
     )
 
-
-def _normalize_resource_uri(server: str, resource_uri: str) -> str:
-    if not resource_uri:
-        return ""
-    if resource_uri.startswith("http://") or resource_uri.startswith("https://"):
-        return resource_uri
-    if resource_uri.startswith("/"):
-        return f"{server}{resource_uri}"
-    return f"{server}/{resource_uri}"
-
-
 def _asset_href(server: str, assetnum: str, siteid: str) -> str:
     raw = f"{assetnum}/{siteid}"
     b64 = base64.b64encode(raw.encode()).decode().rstrip("=")
@@ -166,16 +155,13 @@ def _update_specs(
     assetnum: str,
     siteid: str,
     specs: list[dict],
-    asset_uri: str = "",
 ) -> None:
     if not specs:
         return
 
-    url = _normalize_resource_uri(server, asset_uri)
-    if not url and assetnum and siteid:
-        url = _asset_href(server, assetnum, siteid)
-    if not url:
+    if not assetnum or not siteid:
         raise RuntimeError("Asset-URL fuer Spec-Update konnte nicht bestimmt werden")
+    url = _asset_href(server, assetnum, siteid)
 
     payload = {
         "spi:assetspec": [
@@ -283,8 +269,14 @@ def post_asset(server: str, session, entry: dict) -> dict:
     asset_uri = _extract_resource_uri(response)
     specs = _build_spec_payload(entry)
 
+    if asset_uri:
+        logger.debug(
+            "Asset create returned Location header=%s but spec update uses encoded href",
+            asset_uri,
+        )
+
     # Create the asset first, then merge specs so we do not replace existing rows.
-    if specs and (assetnum or asset_uri):
+    if specs and assetnum:
         try:
             _update_specs(
                 server,
@@ -292,7 +284,6 @@ def post_asset(server: str, session, entry: dict) -> dict:
                 assetnum,
                 _pick_text(entry, "siteid"),
                 specs,
-                asset_uri=asset_uri,
             )
         except (RuntimeError, ValueError) as exc:
             logger.error(
