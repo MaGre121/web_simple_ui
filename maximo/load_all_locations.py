@@ -8,8 +8,7 @@ from maximo.oslc.session import create_session, load_environment
 
 
 def load_or_fetch_locations(server: str, session) -> list[dict]:
-    settings.CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    settings.LOC_AREA_DIR.mkdir(parents=True, exist_ok=True)
+    settings.ensure_runtime_dirs()
 
     if settings.USE_CACHE and settings.CACHE_RAW_FILE.exists():
         return json.loads(settings.CACHE_RAW_FILE.read_text(encoding="utf-8"))
@@ -21,10 +20,7 @@ def load_or_fetch_locations(server: str, session) -> list[dict]:
         settings.OSLC_PARAMS_LOCATIONS,
         settings.MAX_PAGES,
     )
-    settings.CACHE_RAW_FILE.write_text(
-        json.dumps(locations, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    settings.write_json_atomic(settings.CACHE_RAW_FILE, locations)
     return locations
 
 
@@ -40,10 +36,7 @@ def main() -> None:
     print(f"Flat Locations: {len(flat)}")
     print(f"Root Locations: {len(tree)}")
 
-    settings.CACHE_TREE_FILE.write_text(
-        json.dumps(tree, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    settings.write_json_atomic(settings.CACHE_TREE_FILE, tree)
     export_firmengelaende(tree, 2, settings.LOC_AREA_DIR)
 
 

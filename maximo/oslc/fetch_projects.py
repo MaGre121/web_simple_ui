@@ -1,11 +1,6 @@
-import json
 import logging
 
-from maximo.config.settings import (
-    CACHE_PROJECTS_FILE,
-    OSLC_MXPROJECTS_ENDPOINT,
-    OSLC_MXPROJECT_PARAMS,
-)
+from maximo.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +23,8 @@ def fetch_projects(server: str, session) -> list[dict]:
     items = fetch_all_oslc(
         server,
         session,
-        OSLC_MXPROJECTS_ENDPOINT,
-        OSLC_MXPROJECT_PARAMS,
+        settings.OSLC_MXPROJECTS_ENDPOINT,
+        settings.OSLC_MXPROJECT_PARAMS,
         max_pages=50,
     )
 
@@ -39,8 +34,5 @@ def fetch_projects(server: str, session) -> list[dict]:
 
 
 def save_projects(projects: list[dict]):
-    CACHE_PROJECTS_FILE.write_text(
-        json.dumps(projects, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    logger.info("Projects saved to %s", CACHE_PROJECTS_FILE)
+    settings.write_json_atomic(settings.CACHE_PROJECTS_FILE, projects)
+    logger.info("Projects saved to %s", settings.CACHE_PROJECTS_FILE)

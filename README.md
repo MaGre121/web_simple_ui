@@ -7,8 +7,8 @@ Die Anwendung speichert ihre Queue lokal als JSON-Datei und sendet Eintraege ers
 
 - Backend: FastAPI
 - Frontend: Vanilla HTML und JavaScript
-- Persistenz: `maximo/cache/queue.json`
-- Templates: `maximo/cache/templates.json`
+- Persistenz: lokaler App-Ordner, z. B. `%LOCALAPPDATA%\MaximoAssetScanUI\cache\queue.json`
+- Templates: lokaler App-Ordner, z. B. `%LOCALAPPDATA%\MaximoAssetScanUI\cache\templates.json`
 - Startskript: `run_web.py`
 
 ## Voraussetzungen
@@ -39,42 +39,34 @@ pip install -r requirements.txt
 
 ## Konfiguration
 
-Die Web-Anwendung liest ihre Maximo-Konfiguration aus der Datei `maximo/.env`.
+Die Web-Anwendung erwartet `SERVER` und `LtpaToken2` direkt im UI.
 
-1. Beispiel kopieren:
+Nach dem Start gilt:
 
-```bash
-cp maximo/.env.example maximo/.env
-```
-
-2. `maximo/.env` befuellen:
-
-```env
-SERVER=https://dein-maximo-server
-MAXIMO_LTPA_TOKEN2=dein_ltpatoken2_cookie
-```
-
-Hinweise:
-
-- `SERVER` ist die Basis-URL der Maximo-Instanz.
-- `MAXIMO_LTPA_TOKEN2` ist der Cookie-Wert aus dem Browser.
+- `SERVER` ist die Basis-URL der Maximo-Instanz und wird lokal in `config.json` im App-Ordner gespeichert.
+- `LtpaToken2` wird nur zur Laufzeit an das Backend uebergeben und nicht auf Disk geschrieben.
 - Den Cookie findest du in der Browser-Entwicklerkonsole unter `Application` oder `Storage` bei den Cookies.
 - Der Wert muss ohne zusaetzliche Leerzeichen eingefuegt werden.
+- Fuer lokale Tests kann der App-Ordner ueber `MAXIMO_APP_DATA_DIR` umgebogen werden.
 
 ## Templates vorbereiten
 
-Vor dem ersten Start der Web-UI muss `templates.json` erzeugt werden.
+Vor der ersten Benutzung muessen die Cache-Dateien einmal geladen werden.
 
-```bash
-python -m maximo.main
-```
+1. Web-UI starten.
+2. `SERVER` und `LtpaToken2` eintragen.
+3. `Hole Daten` ausfuehren.
 
-Dadurch werden die benoetigten Cache-Dateien unter `maximo/cache/` angelegt, insbesondere:
+Dadurch werden die benoetigten Cache-Dateien im lokalen App-Ordner angelegt, insbesondere:
 
-- `maximo/cache/templates.json`
-- `maximo/cache/queue.json` wird spaeter automatisch erzeugt
+- `cache/templates.json`
+- `cache/projects.json`
+- `cache/users.json`
+- `cache/locations_raw.json`
+- `cache/locations_tree.json`
+- `cache/queue.json` wird spaeter automatisch erzeugt
 
-Wenn `templates.json` fehlt, liefert die Web-UI bei `/api/templates` einen Fehler.
+Optional bleibt `python -m maximo.main` als CLI-Refresh nutzbar, wenn `SERVER` und `MAXIMO_LTPA_TOKEN2` bereits als Prozess-Umgebungsvariablen gesetzt wurden.
 
 ## Kompilieren / Syntax pruefen
 
@@ -100,6 +92,32 @@ Danach im Browser oeffnen:
 http://127.0.0.1:8000
 ```
 
+## Windows EXE Build
+
+Fuer einen Windows-Testbuild ist jetzt eine PyInstaller-Konfiguration vorhanden:
+
+- `MaximoAssetScanUI.spec`
+- `build_windows_exe.bat`
+- `requirements-build.txt`
+
+Build auf einem Windows-Rechner:
+
+```bat
+build_windows_exe.bat
+```
+
+Danach liegt die Datei hier:
+
+```text
+dist\MaximoAssetScanUI.exe
+```
+
+Hinweise:
+
+- Der Build muss auf Windows ausgefuehrt werden, wenn du eine native Windows-`.exe` willst.
+- Die EXE nutzt weiterhin den lokalen App-Ordner fuer `config.json` und `cache\*.json`.
+- `LtpaToken2` bleibt auch im EXE-Betrieb runtime-only und wird nicht auf Disk geschrieben.
+
 ## Bedienung
 
 ### 1. Template auswaehlen
@@ -119,9 +137,9 @@ Je nach Template erscheinen:
 
 ### 3. Zur Queue hinzufuegen
 
-- `Zur Queue` speichert den Eintrag lokal in `maximo/cache/queue.json`.
+- `Zur Queue` speichert den Eintrag lokal in `cache/queue.json` im App-Ordner.
 - Nach erfolgreichem Speichern wird das Formular zurueckgesetzt.
-- Der Fokus springt wieder auf das Template-Feld, damit ein Barcode-Scanner direkt weiterarbeiten kann.
+- Der Fokus springt wieder auf `serialnum`, damit ein Barcode-Scanner direkt weiterarbeiten kann.
 
 ### 4. Queue verwalten
 
@@ -144,22 +162,26 @@ Eintraege koennen ueber `Delete` aus der Queue entfernt werden.
 
 Die Anwendung arbeitet ohne Datenbank. Relevante Dateien:
 
-- `maximo/cache/templates.json`: importierte Template-Daten
-- `maximo/cache/queue.json`: lokale Upload-Queue
+- `config.json`: gespeicherter `SERVER`
+- `cache/templates.json`: importierte Template-Daten
+- `cache/projects.json`: importierte Projektdaten
+- `cache/users.json`: importierte Benutzerdaten
+- `cache/locations_raw.json` und `cache/locations_tree.json`: importierte Locations
+- `cache/queue.json`: lokale Upload-Queue
 
 Die Queue bleibt auch nach einem Neustart der Anwendung erhalten.
+`LtpaToken2` wird nicht gespeichert.
 
 ## Typischer Ablauf
 
 ```bash
 source .venv/bin/activate
 pip install -r requirements.txt
-cp maximo/.env.example maximo/.env
-# maximo/.env befuellen
-python -m maximo.main
 python -m compileall maximo run_web.py
 python run_web.py
 ```
+
+Danach im Browser `http://127.0.0.1:8000` oeffnen, `SERVER` und `LtpaToken2` eingeben und `Hole Daten` ausfuehren.
 
 ## Fehlerbilder
 
@@ -175,15 +197,13 @@ pip install -r requirements.txt
 
 Die Template-Daten wurden noch nicht aus Maximo geladen:
 
-```bash
-python -m maximo.main
-```
+Web-UI starten, `SERVER` und `LtpaToken2` eingeben und `Hole Daten` ausfuehren.
 
 ### Maximo-Upload liefert Fehler
 
 Pruefen:
 
-- Ist `SERVER` in `maximo/.env` korrekt?
-- Ist `MAXIMO_LTPA_TOKEN2` noch gueltig?
+- Ist `SERVER` im UI korrekt?
+- Wurde ein gueltiges `LtpaToken2` fuer die aktuelle Laufzeit gesetzt?
 - Ist das gewaehlte Template in Maximo noch passend?
 - Sind `location`, `serialnum` und alle sichtbaren Spec-Felder befuellt?

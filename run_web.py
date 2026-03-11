@@ -2,11 +2,13 @@ import logging
 
 import uvicorn
 
+from maximo.web.app import app
+
 
 def main() -> None:
     logging.basicConfig(level=logging.DEBUG)
     uvicorn.run(
-        "maximo.web.app:app",
+        app,
         host="127.0.0.1",
         port=8000,
         reload=False,

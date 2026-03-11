@@ -313,12 +313,12 @@
         <div class="field">
           <label for="serverInput">Server</label>
           <input id="serverInput" type="text" autocomplete="off" spellcheck="false" placeholder="https://company.example">
-          <div class="field-hint">Wird lokal im Browser gehalten und direkt an das Backend uebergeben.</div>
+          <div class="field-hint">Wird im lokalen App-Ordner gespeichert und beim Start wieder geladen.</div>
         </div>
         <div class="field">
           <label for="ltpaTokenInput">LtpaToken2</label>
           <input id="ltpaTokenInput" type="password" autocomplete="off" spellcheck="false" placeholder="LtpaToken2 ...">
-          <div class="field-hint">Wird fuer Session und Datenabruf verwendet.</div>
+          <div class="field-hint">Wird nur zur Laufzeit an das Backend uebergeben und nicht gespeichert.</div>
         </div>
       </div>
       <div class="button-row">
@@ -441,7 +441,6 @@
 "use strict";
 
 const MAC_SPEC_IDS = new Set(["bam.macadresse"]);
-const SETTINGS_STORAGE_KEY = "maximo-web-settings-v1";
 
 /* ── state ── */
 const state = {
@@ -526,15 +525,18 @@ function normalizeMac(value) {
 function renderConnectionStatus(data) {
   const error = String((data && data.error) || "").trim();
   const sessionReady = Boolean(data && data.session_ready);
-  let text = "SERVER und LtpaToken2 koennen direkt im UI gesetzt werden.";
+  const server = String((data && (data.active_server || data.server)) || "").trim();
+  let text = "Server speichern. LtpaToken2 wird nur im laufenden Backend gehalten.";
   let type = "info";
 
   if (sessionReady) {
-    text = "Session bereit fuer " + (data.active_server || data.server || "-");
+    text = "Session bereit fuer " + (server || "-");
     type = "ok";
   } else if (error) {
     text = error;
     type = "error";
+  } else if (server) {
+    text = "Server gespeichert: " + server + ". LtpaToken2 fuer eine neue Session eingeben.";
   }
 
   connectionStatus.textContent = text;
@@ -565,22 +567,6 @@ function connectionPayload() {
     server: serverInput.value.trim(),
     ltpa_token2: ltpaTokenInput.value.trim(),
   };
-}
-
-function loadStoredSettings() {
-  try {
-    return JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) || "{}");
-  } catch (err) {
-    return {};
-  }
-}
-
-function saveStoredSettings() {
-  try {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(connectionPayload()));
-  } catch (err) {
-    // Browser storage is optional for this workflow.
-  }
 }
 
 /* ── label builders ── */
@@ -936,36 +922,14 @@ async function loadSettings() {
   const data = await readJson(res);
   if (!res.ok) throw new Error(apiError(data, "Verbindung konnte nicht geladen werden"));
 
-  if (data.server || data.ltpa_token2) {
-    serverInput.value = data.server || "";
-    ltpaTokenInput.value = data.ltpa_token2 || "";
-    saveStoredSettings();
-    renderConnectionStatus(data);
-    return data;
-  }
-
-  const stored = loadStoredSettings();
-  serverInput.value = stored.server || "";
-  ltpaTokenInput.value = stored.ltpa_token2 || "";
-  if (serverInput.value || ltpaTokenInput.value) {
-    renderConnectionStatus({
-      error: "Lokale Browserwerte geladen. Verbindung wird beim ersten Speichern oder 'Hole Daten' aktiviert.",
-      session_ready: false,
-    });
-    return {
-      server: serverInput.value,
-      ltpa_token2: ltpaTokenInput.value,
-      session_ready: false,
-      active_server: "",
-      error: "",
-    };
-  }
-
+  serverInput.value = data.server || "";
+  ltpaTokenInput.value = "";
   renderConnectionStatus(data);
   return data;
 }
 
 async function saveSettings() {
+  const hadToken = Boolean(ltpaTokenInput.value.trim());
   const res = await fetch("/api/settings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -973,7 +937,9 @@ async function saveSettings() {
   });
   const data = await readJson(res);
   if (!res.ok) throw new Error(apiError(data, "Verbindung konnte nicht gespeichert werden"));
-  saveStoredSettings();
+  if (hadToken && data.has_runtime_token) {
+    ltpaTokenInput.value = "";
+  }
   renderConnectionStatus(data);
   return data;
 }
@@ -1183,7 +1149,7 @@ fetchDataButton.addEventListener("click", async function() {
     await saveSettings();
     const result = await fetchMasterData();
     await loadData();
-    const summary = String(result.stdout || "").trim().split("\n").filter(Boolean).slice(-1)[0];
+    const summary = String(result.message || "").trim();
     showMessage(
       summary ? "Daten erfolgreich geladen: " + summary : "Daten erfolgreich geladen.",
       "ok",
@@ -1199,10 +1165,7 @@ fetchDataButton.addEventListener("click", async function() {
 (async function init() {
   setBusy(true);
   try {
-    const settings = await loadSettings();
-    if (!settings.session_ready && serverInput.value.trim() && ltpaTokenInput.value.trim()) {
-      await saveSettings();
-    }
+    await loadSettings();
     await loadQueue();
     try {
       await loadData();

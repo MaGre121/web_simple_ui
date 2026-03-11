@@ -1,12 +1,6 @@
-import json
 import logging
 
-from maximo.config.settings import (
-    CACHE_TEMPLATES_FILE,
-    DEFAULT_SITEID,
-    OSLC_MXITEM_ENDPOINT,
-    OSLC_MXITEM_PARAMS,
-)
+from maximo.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +33,7 @@ def _parse_template(item: dict) -> dict:
         "itemnum": item.get("spi:itemnum"),
         "description": item.get("spi:description"),
         "itemsetid": item.get("spi:itemsetid"),
-        "siteid": DEFAULT_SITEID,
+        "siteid": settings.DEFAULT_SITEID,
         "orgid": orgid,
         "classstructureid": classstructureid,
         "fixed_specs": fixed_specs,
@@ -55,8 +49,8 @@ def fetch_templates(server: str, session) -> list[dict]:
     items = fetch_all_oslc(
         server,
         session,
-        OSLC_MXITEM_ENDPOINT,
-        OSLC_MXITEM_PARAMS,
+        settings.OSLC_MXITEM_ENDPOINT,
+        settings.OSLC_MXITEM_PARAMS,
         max_pages=50,
     )
 
@@ -66,8 +60,5 @@ def fetch_templates(server: str, session) -> list[dict]:
 
 
 def save_templates(templates: list[dict]):
-    CACHE_TEMPLATES_FILE.write_text(
-        json.dumps(templates, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    logger.info("Templates saved to %s", CACHE_TEMPLATES_FILE)
+    settings.write_json_atomic(settings.CACHE_TEMPLATES_FILE, templates)
+    logger.info("Templates saved to %s", settings.CACHE_TEMPLATES_FILE)

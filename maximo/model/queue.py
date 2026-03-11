@@ -2,15 +2,15 @@ import json
 from copy import deepcopy
 from uuid import uuid4
 
-from maximo.config.settings import CACHE_DIR, CACHE_QUEUE_FILE
+from maximo.config.settings import CACHE_QUEUE_FILE, ensure_runtime_dirs, write_json_atomic
 from maximo.normalization import pick_text as _pick_text
 
 
 def _ensure_queue_file() -> None:
     # Fresh installs do not have a queue file yet.
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_runtime_dirs()
     if not CACHE_QUEUE_FILE.exists():
-        CACHE_QUEUE_FILE.write_text("[]\n", encoding="utf-8")
+        write_json_atomic(CACHE_QUEUE_FILE, [])
 
 
 def _normalize_queue_entry(entry):
@@ -53,10 +53,7 @@ def load_queue() -> list[dict]:
 def save_queue(queue: list[dict]) -> None:
     _ensure_queue_file()
     normalized_queue = [_normalize_queue_entry(entry) for entry in queue]
-    CACHE_QUEUE_FILE.write_text(
-        json.dumps(normalized_queue, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    write_json_atomic(CACHE_QUEUE_FILE, normalized_queue)
 
 
 def add_to_queue(entry: dict) -> dict:

@@ -1,11 +1,14 @@
 # Konfiguration
 
-umbenennen .env.example -> .env
+Die Laufzeit-Konfiguration kommt nicht mehr aus einer `.env`-Datei.
 
-.env file mit MAXIMO_LTPA_TOKEN2= anpassen, das token lässt sich im Browser über
-Entwickler-Konsole extrahieren (F12)
+- `SERVER` wird in der Web-UI eingetragen und als nicht-geheime Einstellung im lokalen App-Ordner gespeichert.
+- `LtpaToken2` wird in der Web-UI eingetragen, nur zur Laufzeit an das Backend uebergeben und nicht auf Disk gespeichert.
+- Den Cookie findest du in der Browser-Entwicklerkonsole unter `Application` oder `Storage` bei den Cookies.
 
-*Application / cookies / LtpaToken2 -> value ~866 byte*
+Fuer den normalen Web-UI-Betrieb:
 
-diesen Wert OHNE LEERZEICHEN in .env einfügen
-
+1. `python run_web.py` starten
+2. `http://127.0.0.1:8000` oeffnen
+3. `SERVER` und `LtpaToken2` eintragen
+4. `Hole Daten` ausfuehren

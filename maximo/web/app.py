@@ -1,8 +1,5 @@
 import json
 import logging
-import os
-import subprocess
-import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -11,6 +8,7 @@ from fastapi import Body, FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, JSONResponse
 
 from maximo.config import settings
+from maximo.main import format_refresh_summary, refresh_master_data
 from maximo.model.queue import add_to_queue, load_queue, remove_from_queue, save_queue
 from maximo.normalization import (
     clean_text as _clean_text,
@@ -25,18 +23,34 @@ from maximo.oslc.session import (
 
 logger = logging.getLogger(__name__)
 
-INDEX_FILE = Path(__file__).resolve().parent / "templates" / "index.html"
+INDEX_FILE = settings.WEB_INDEX_FILE
 
 
-def _set_session_state(app: FastAPI, server: str, token: str) -> None:
-    cleaned_server = _clean_text(server)
+def _clear_runtime_session(app: FastAPI) -> None:
+    app.state.ltpa_token2 = None
+    app.state.session = None
+    app.state.startup_error = ""
+
+
+def _store_server_state(app: FastAPI, server: str) -> str:
+    cleaned_server = settings.persist_server(_clean_text(server))
+    app.state.server = cleaned_server or None
+
+    if not cleaned_server:
+        _clear_runtime_session(app)
+
+    return cleaned_server
+
+
+def _activate_session(app: FastAPI, server: str, token: str) -> None:
+    cleaned_server = _store_server_state(app, server)
     cleaned_token = _clean_text(token)
 
     if not cleaned_server or not cleaned_token:
-        app.state.server = None
-        app.state.session = None
-        app.state.startup_error = "Session-Fehler: SERVER oder MAXIMO_LTPA_TOKEN2 fehlt"
-        return
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="SERVER und LtpaToken2 muessen gesetzt sein.",
+        )
 
     app.state.server = cleaned_server
     app.state.ltpa_token2 = cleaned_token
@@ -45,31 +59,43 @@ def _set_session_state(app: FastAPI, server: str, token: str) -> None:
     logger.info("Maximo-Session initialisiert fuer %s", cleaned_server)
 
 
-def _connection_payload(app: FastAPI, payload: dict | None = None) -> tuple[str, str]:
+def _connection_input(app: FastAPI, payload: dict | None = None) -> dict[str, str]:
     body = payload or {}
-    current_server = _clean_text(getattr(app.state, "server", ""))
-    current_token = _clean_text(getattr(app.state, "ltpa_token2", ""))
-
-    server = _clean_text(body.get("server")) or current_server
-    token = _clean_text(
+    provided_server = _clean_text(body.get("server"))
+    provided_token = _clean_text(
         body.get("ltpa_token2")
         or body.get("LtpaToken2")
         or body.get("MAXIMO_LTPA_TOKEN2")
-    ) or current_token
+    )
+    current_server = _clean_text(getattr(app.state, "server", ""))
+    current_token = _clean_text(getattr(app.state, "ltpa_token2", ""))
 
-    if not server or not token:
+    return {
+        "provided_server": provided_server,
+        "provided_token": provided_token,
+        "current_server": current_server,
+        "current_token": current_token,
+        "server": provided_server or current_server,
+        "token": provided_token or current_token,
+    }
+
+
+def _require_connection(app: FastAPI, payload: dict | None = None) -> tuple[str, str]:
+    connection = _connection_input(app, payload)
+    if not connection["server"] or not connection["token"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="SERVER und LtpaToken2 muessen gesetzt sein.",
         )
 
-    return server, token
+    return connection["server"], connection["token"]
 
 
 def _connection_response(app: FastAPI) -> dict[str, Any]:
     return {
         "server": _clean_text(getattr(app.state, "server", "")),
-        "ltpa_token2": _clean_text(getattr(app.state, "ltpa_token2", "")),
+        "ltpa_token2": "",
+        "has_runtime_token": bool(_clean_text(getattr(app.state, "ltpa_token2", ""))),
         "session_ready": bool(getattr(app.state, "server", None) and app.state.session),
         "active_server": _clean_text(getattr(app.state, "server", "")),
         "error": _clean_text(getattr(app.state, "startup_error", "")),
@@ -196,7 +222,7 @@ def _load_templates() -> list[dict]:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=(
                 f"Template-Datei fehlt: {settings.CACHE_TEMPLATES_FILE}. "
-                "Bitte zuerst den Template-Fetch ausfuehren."
+                "Bitte zuerst 'Hole Daten' ausfuehren."
             ),
         )
 
@@ -343,7 +369,7 @@ def _load_locations() -> list[dict[str, str]]:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=(
                 "Keine Location-Datei gefunden. Bitte zuerst "
-                "`python -m maximo.main` ausfuehren."
+                "'Hole Daten' ausfuehren."
             ),
         )
 
@@ -368,7 +394,8 @@ def _load_queue_or_http_error() -> list[dict]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.server = None
+    settings.ensure_runtime_dirs()
+    app.state.server = settings.load_persisted_server() or None
     app.state.ltpa_token2 = None
     app.state.session = None
     app.state.startup_error = ""
@@ -391,8 +418,21 @@ def get_settings(request: Request):
 
 @app.post("/api/settings")
 def save_settings(request: Request, payload: dict = Body(...)):
-    server, token = _connection_payload(request.app, payload)
-    _set_session_state(request.app, server, token)
+    connection = _connection_input(request.app, payload)
+    target_server = connection["server"]
+    server_changed = bool(
+        connection["provided_server"]
+        and connection["provided_server"] != connection["current_server"]
+    )
+
+    if target_server:
+        _store_server_state(request.app, target_server)
+
+    if connection["provided_token"]:
+        _activate_session(request.app, target_server, connection["provided_token"])
+    elif server_changed:
+        _clear_runtime_session(request.app)
+
     return JSONResponse(_connection_response(request.app))
 
 
@@ -494,53 +534,26 @@ def upload_queue(request: Request):
 
 @app.post("/api/fetch-data")
 def fetch_data(request: Request, payload: dict | None = Body(default=None)):
-    server, token = _connection_payload(request.app, payload)
-    _set_session_state(request.app, server, token)
-
-    cmd = [sys.executable, "-m", "maximo.main"]
-    logger.info("Starte Datenabruf: %s", " ".join(cmd))
+    server, token = _require_connection(request.app, payload)
+    _activate_session(request.app, server, token)
+    logger.info("Starte Datenabruf fuer %s", server)
 
     try:
-        env = os.environ.copy()
-        env["SERVER"] = server
-        env["MAXIMO_LTPA_TOKEN2"] = token
-        env["PYTHONIOENCODING"] = "utf-8"
-        env.setdefault("PYTHONUTF8", "1")
-        result = subprocess.run(
-            cmd,
-            cwd=str(settings.BASE_DIR.parent),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
-            timeout=600,
-        )
-    except subprocess.TimeoutExpired as exc:
+        summary = refresh_master_data(server, request.app.state.session)
+    except Exception as exc:
+        logger.exception("Datenabruf fehlgeschlagen fuer %s", server)
         return JSONResponse(
             {
                 "success": False,
-                "stdout": _clean_text(exc.stdout or ""),
-                "stderr": _clean_text(exc.stderr or ""),
-                "detail": "Datenabruf hat das Zeitlimit ueberschritten.",
-            },
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-        )
-
-    response = {
-        "success": result.returncode == 0,
-        "returncode": result.returncode,
-        "stdout": _clean_text(result.stdout),
-        "stderr": _clean_text(result.stderr),
-    }
-
-    if result.returncode != 0:
-        return JSONResponse(
-            {
-                **response,
-                "detail": "Datenabruf fehlgeschlagen.",
+                "detail": f"Datenabruf fehlgeschlagen: {exc}",
             },
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
-    return JSONResponse(response)
+    return JSONResponse(
+        {
+            "success": True,
+            "summary": summary,
+            "message": format_refresh_summary(summary),
+        }
+    )
