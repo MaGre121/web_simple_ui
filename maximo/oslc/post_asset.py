@@ -13,14 +13,6 @@ from maximo.normalization import (
 
 logger = logging.getLogger(__name__)
 
-
-def _trim_text(value: str, limit: int = 1000) -> str:
-    text = _clean_text(value)
-    if len(text) <= limit:
-        return text
-    return f"{text[:limit]}..."
-
-
 def _build_create_payload(entry: dict) -> dict:
     payload = {}
 
@@ -205,7 +197,7 @@ def _update_specs(
         assetnum,
         response.status_code,
         dict(response.headers),
-        _trim_text(response.text),
+        response.text,
     )
 
     if response.status_code != 200:
@@ -256,7 +248,7 @@ def post_asset(server: str, session, entry: dict) -> dict:
         entry.get("itemnum"),
         response.status_code,
         dict(response.headers),
-        _trim_text(response.text),
+        response.text,
     )
 
     if not response.ok:
