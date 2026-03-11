@@ -303,6 +303,73 @@
     .connection-status[data-type="info"] { background: rgba(23,32,51,0.06); border-color: rgba(23,32,51,0.08); }
     .connection-status[data-type="ok"] { background: rgba(40,115,76,0.12); border-color: rgba(40,115,76,0.2); color: #174b31; }
     .connection-status[data-type="error"] { background: rgba(170,60,60,0.12); border-color: rgba(170,60,60,0.22); color: #7f2626; }
+    .fetch-progress {
+      display: grid;
+      gap: 10px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(184,92,56,0.18);
+      background: rgba(255,255,255,0.66);
+    }
+    .fetch-progress[hidden] { display: none; }
+    .fetch-progress[data-state="ok"] {
+      border-color: rgba(40,115,76,0.24);
+      background: rgba(40,115,76,0.08);
+    }
+    .fetch-progress[data-state="error"] {
+      border-color: rgba(170,60,60,0.24);
+      background: rgba(170,60,60,0.08);
+    }
+    .fetch-progress-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .fetch-progress-label { font-size: 13px; font-weight: 700; }
+    .fetch-progress-value {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .fetch-progress-bar {
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(23,32,51,0.08);
+    }
+    .fetch-progress-fill {
+      position: relative;
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #c46a45, #b85c38 55%, #7c351b);
+      transition: width 0.28s ease;
+      overflow: hidden;
+    }
+    .fetch-progress[data-state="ok"] .fetch-progress-fill {
+      background: linear-gradient(90deg, #379866, #28734c);
+    }
+    .fetch-progress[data-state="error"] .fetch-progress-fill {
+      background: linear-gradient(90deg, #d46969, #aa3c3c);
+    }
+    .fetch-progress-fill::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.42), transparent);
+      transform: translateX(-100%);
+      animation: fetch-progress-shimmer 1.25s linear infinite;
+    }
+    .fetch-progress-hint {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    @keyframes fetch-progress-shimmer {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(100%); }
+    }
   </style>
 </head>
 <body>
@@ -338,6 +405,16 @@
         <button id="fetchDataButton" class="primary-button" type="button">Hole Daten</button>
       </div>
       <div id="connectionStatus" class="connection-status" data-type="info">Noch keine Verbindung geladen.</div>
+      <div id="fetchProgress" class="fetch-progress" data-state="loading" hidden>
+        <div class="fetch-progress-head">
+          <div id="fetchProgressLabel" class="fetch-progress-label">Datenabruf laeuft ...</div>
+          <div id="fetchProgressValue" class="fetch-progress-value">0%</div>
+        </div>
+        <div class="fetch-progress-bar" aria-hidden="true">
+          <div id="fetchProgressFill" class="fetch-progress-fill"></div>
+        </div>
+        <div id="fetchProgressHint" class="fetch-progress-hint">Bitte warten.</div>
+      </div>
     </div>
   </article>
 
@@ -474,6 +551,11 @@ const ltpaTokenInput  = document.getElementById("ltpaTokenInput");
 const saveSettingsButton = document.getElementById("saveSettingsButton");
 const fetchDataButton = document.getElementById("fetchDataButton");
 const connectionStatus = document.getElementById("connectionStatus");
+const fetchProgress = document.getElementById("fetchProgress");
+const fetchProgressLabel = document.getElementById("fetchProgressLabel");
+const fetchProgressValue = document.getElementById("fetchProgressValue");
+const fetchProgressFill = document.getElementById("fetchProgressFill");
+const fetchProgressHint = document.getElementById("fetchProgressHint");
 const templateInput   = document.getElementById("templateSearch");
 const templateOptions = document.getElementById("templateOptions");
 const projectInput    = document.getElementById("projectSearch");
@@ -493,6 +575,9 @@ const queueSummary    = document.getElementById("queueSummary");
 const addButton       = document.getElementById("addButton");
 const clearButton     = document.getElementById("clearButton");
 const uploadButton    = document.getElementById("uploadButton");
+let fetchProgressTimer = null;
+let fetchProgressHideTimer = null;
+let fetchProgressPercent = 0;
 
 /* ── helpers ── */
 function showMessage(text, type) {
@@ -503,6 +588,68 @@ function showMessage(text, type) {
   messageBox.textContent = text;
   messageBox.dataset.type = type || "info";
   messageBox.classList.add("visible");
+}
+
+function clearFetchProgressTimers() {
+  if (fetchProgressTimer !== null) {
+    window.clearInterval(fetchProgressTimer);
+    fetchProgressTimer = null;
+  }
+  if (fetchProgressHideTimer !== null) {
+    window.clearTimeout(fetchProgressHideTimer);
+    fetchProgressHideTimer = null;
+  }
+}
+
+function renderFetchProgress(state, label, hint) {
+  fetchProgress.hidden = false;
+  fetchProgress.dataset.state = state || "loading";
+  fetchProgressLabel.textContent = label || "Datenabruf laeuft ...";
+  fetchProgressHint.textContent = hint || "Bitte warten.";
+  fetchProgressValue.textContent = Math.round(fetchProgressPercent) + "%";
+  fetchProgressFill.style.width = fetchProgressPercent + "%";
+}
+
+function startFetchProgress(label, hint) {
+  clearFetchProgressTimers();
+  fetchProgressPercent = 8;
+  renderFetchProgress("loading", label, hint);
+  fetchProgressTimer = window.setInterval(function() {
+    if (fetchProgressPercent >= 92) return;
+    if (fetchProgressPercent < 55) {
+      fetchProgressPercent += 6;
+    } else if (fetchProgressPercent < 78) {
+      fetchProgressPercent += 3;
+    } else {
+      fetchProgressPercent += 1;
+    }
+    renderFetchProgress("loading", fetchProgressLabel.textContent, fetchProgressHint.textContent);
+  }, 420);
+}
+
+function setFetchProgress(percent, label, hint) {
+  fetchProgressPercent = Math.max(fetchProgressPercent, Math.min(100, percent));
+  renderFetchProgress("loading", label || fetchProgressLabel.textContent, hint || fetchProgressHint.textContent);
+}
+
+function hideFetchProgress() {
+  clearFetchProgressTimers();
+  fetchProgressPercent = 0;
+  fetchProgress.hidden = true;
+  fetchProgress.dataset.state = "loading";
+  fetchProgressFill.style.width = "0%";
+  fetchProgressValue.textContent = "0%";
+}
+
+function finishFetchProgress(state, label, hint, hideDelayMs) {
+  clearFetchProgressTimers();
+  fetchProgressPercent = state === "error"
+    ? Math.max(fetchProgressPercent, 18)
+    : 100;
+  renderFetchProgress(state, label, hint);
+  fetchProgressHideTimer = window.setTimeout(function() {
+    hideFetchProgress();
+  }, hideDelayMs || 1500);
 }
 
 function setBusy(val) {
@@ -1349,16 +1496,42 @@ saveSettingsButton.addEventListener("click", async function() {
 fetchDataButton.addEventListener("click", async function() {
   setBusy(true);
   showMessage("");
+  startFetchProgress(
+    "Verbindung wird gespeichert ...",
+    "Backend-Session wird vorbereitet.",
+  );
   try {
     await saveSettings();
+    setFetchProgress(
+      24,
+      "Daten werden aus Maximo geladen ...",
+      "Templates, Projekte, Locations und Nutzer werden aktualisiert.",
+    );
     const result = await fetchMasterData();
+    setFetchProgress(
+      88,
+      "Lokaler Cache wird aktualisiert ...",
+      "Die geladenen Stammdaten werden in die UI uebernommen.",
+    );
     await loadData();
     const summary = String(result.message || "").trim();
+    finishFetchProgress(
+      "ok",
+      "Daten erfolgreich geladen.",
+      summary || "Stammdaten sind aktuell.",
+      1600,
+    );
     showMessage(
       summary ? "Daten erfolgreich geladen: " + summary : "Daten erfolgreich geladen.",
       "ok",
     );
   } catch (err) {
+    finishFetchProgress(
+      "error",
+      "Datenabruf fehlgeschlagen.",
+      err.message || "Unbekannter Fehler.",
+      2600,
+    );
     showMessage(err.message, "error");
   } finally {
     setBusy(false);
