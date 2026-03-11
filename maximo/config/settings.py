@@ -24,7 +24,7 @@ LOC_AREA_DIR = CACHE_DIR / "loc-area"
 
 OSLC_ENDPOINT_LOCATIONS = "/maximo/oslc/os/cxsrklocation"
 OSLC_ENDPOINT_ASSETS = "/maximo/oslc/os/bwasset6"
-OSLC_ENDPOINT_USERS = "/maximo/oslc/os/cduiuser"
+OSLC_ENDPOINT_USERS = "/maximo/oslc/os/mxapiperuser"
 OSLC_MXITEM_ENDPOINT = "/maximo/oslc/os/mxitem"
 OSLC_MXPROJECTS_ENDPOINT = "/maximo/oslc/os/cxprojekt"
 
@@ -55,5 +55,5 @@ OSLC_MXPROJECT_PARAMS = {
 OSLC_USERS_PARAMS = {
     "oslc.where": 'spi:status="AKTIV"',
     "oslc.select": "personid",
-    "oslc.pageSize": 1000
+    "oslc.pageSize": 10000
 }
