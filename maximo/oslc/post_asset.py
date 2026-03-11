@@ -282,7 +282,6 @@ def post_asset(server: str, session, entry: dict) -> dict:
     # Create the asset first, then merge specs so we do not replace existing rows.
     if specs and assetnum:
         try:
-            time.sleep(3)
             _update_specs(
                 server,
                 session,

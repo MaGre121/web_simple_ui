@@ -127,6 +127,9 @@ def _normalize_specs(specs: Any, label: str) -> dict[str, str]:
                     detail=str(exc),
                 ) from exc
 
+        if label == "user_specs" and not cleaned_value:
+            continue
+
         normalized[cleaned_key] = cleaned_value
 
     return normalized
@@ -195,15 +198,6 @@ def _validate_entry(payload: dict) -> dict:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Pflichtfelder fehlen: {', '.join(missing_fields)}",
-        )
-
-    missing_user_specs = [
-        key for key, value in entry["user_specs"].items() if not _clean_text(value)
-    ]
-    if missing_user_specs:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Pflichtwerte fehlen fuer Specs: {', '.join(missing_user_specs)}",
         )
 
     primary_count = sum(1 for u in entry["users"] if u["isprimary"])

@@ -706,7 +706,7 @@ function renderDynamicFields() {
   const specs = Array.isArray(t.user_specs) ? t.user_specs : [];
   specs.forEach(function(specName) {
     const isM = isMacSpec(specName);
-    const f = createField("spec__" + specName, specName + " *", "text", isM ? "Format: AA:BB:CC:DD:EE:FF" : "");
+    const f = createField("spec__" + specName, specName, "text", isM ? "Format: AA:BB:CC:DD:EE:FF" : "");
     dynamicFields.appendChild(f);
   });
 }
@@ -1010,8 +1010,9 @@ function collectEntry() {
       value = normalizeMac(value);
       if (el) el.value = value;
     }
-    if (!value) throw new Error("Pflichtwert fehlt fuer: " + specName);
-    userSpecs[specName] = value;
+    if (value) {
+      userSpecs[specName] = value;
+    }
   });
 
   const t = state.selectedTemplate;

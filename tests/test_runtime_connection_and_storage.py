@@ -61,6 +61,35 @@ class TestRuntimeStorage(RuntimeStorageTestCase):
             str(self.settings.CACHE_QUEUE_FILE).startswith(self.tempdir.name)
         )
 
+    def test_queue_omits_blank_user_specs_when_saving(self):
+        stored_entry = self.queue.add_to_queue(
+            {
+                "itemnum": "CISCO.CATALYST.9200L",
+                "description": "Switch",
+                "siteid": "BWS00001",
+                "orgid": "BTRBZ",
+                "location": "LOC-001",
+                "serialnum": "SN-12345",
+                "projekt": "PRJ-001",
+                "cxprojekt": "PRJ-001",
+                "projektcode": "PRJ-001",
+                "cfglibgroup": "ConfigLibarianGroup",
+                "fixed_specs": {"BAM.TYPENBEZEICHNUNG": "Cisco Catalyst 9200L"},
+                "user_specs": {
+                    "BAM.MACADRESSE": "",
+                    "BAM.NOTIZ": " Rack 12 ",
+                    "": "ignored",
+                },
+                "users": [],
+            }
+        )
+
+        self.assertEqual(stored_entry["user_specs"], {"BAM.NOTIZ": "Rack 12"})
+
+        queue = self.queue.load_queue()
+        self.assertEqual(len(queue), 1)
+        self.assertEqual(queue[0]["user_specs"], {"BAM.NOTIZ": "Rack 12"})
+
 
 @unittest.skipUnless(TestClient is not None, "fastapi is not installed in this test environment")
 class TestRuntimeConnectionAPI(RuntimeStorageTestCase):
@@ -129,6 +158,33 @@ class TestRuntimeConnectionAPI(RuntimeStorageTestCase):
         config_text = self.settings.RUNTIME_CONFIG_FILE.read_text(encoding="utf-8")
         self.assertIn("https://company.example", config_text)
         self.assertNotIn("secret-token", config_text)
+
+    def test_queue_api_accepts_blank_user_specs_and_does_not_persist_them(self):
+        with TestClient(self.web_app.app) as client:
+            response = client.post(
+                "/api/queue",
+                json={
+                    "itemnum": "CISCO.CATALYST.9200L",
+                    "description": "Switch",
+                    "siteid": "BWS00001",
+                    "orgid": "BTRBZ",
+                    "location": "LOC-001",
+                    "serialnum": "SN-12345",
+                    "projekt": "PRJ-001",
+                    "cfglibgroup": "ConfigLibarianGroup",
+                    "fixed_specs": {"BAM.TYPENBEZEICHNUNG": "Cisco Catalyst 9200L"},
+                    "user_specs": {
+                        "BAM.MACADRESSE": "",
+                        "BAM.NOTIZ": " Rack 12 ",
+                    },
+                    "users": [],
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["user_specs"], {"BAM.NOTIZ": "Rack 12"})
 
 
 if __name__ == "__main__":

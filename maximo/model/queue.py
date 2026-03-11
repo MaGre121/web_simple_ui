@@ -3,6 +3,7 @@ from copy import deepcopy
 from uuid import uuid4
 
 from maximo.config.settings import CACHE_QUEUE_FILE, ensure_runtime_dirs, write_json_atomic
+from maximo.normalization import clean_text as _clean_text
 from maximo.normalization import pick_text as _pick_text
 
 
@@ -29,6 +30,18 @@ def _normalize_queue_entry(entry):
     normalized.pop("group", None)
     normalized.pop("cxpersongroup", None)
     normalized.pop("persongroup", None)
+
+    user_specs = normalized.get("user_specs")
+    if isinstance(user_specs, dict):
+        cleaned_user_specs = {}
+        for key, value in user_specs.items():
+            cleaned_key = _clean_text(key)
+            cleaned_value = _clean_text(value)
+            if not cleaned_key or not cleaned_value:
+                continue
+            cleaned_user_specs[cleaned_key] = cleaned_value
+        normalized["user_specs"] = cleaned_user_specs
+
     return normalized
 
 
