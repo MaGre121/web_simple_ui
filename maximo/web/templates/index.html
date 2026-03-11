@@ -507,10 +507,16 @@ function setBusy(val) {
   clearButton.disabled = val;
   uploadButton.disabled = val;
   addUserButton.disabled = val;
-   saveSettingsButton.disabled = val;
-   fetchDataButton.disabled = val;
-   serverInput.disabled = val;
-   ltpaTokenInput.disabled = val;
+  saveSettingsButton.disabled = val;
+  fetchDataButton.disabled = val;
+  serverInput.disabled = val;
+  ltpaTokenInput.disabled = val;
+  queueBody.querySelectorAll("button").forEach(function(button) {
+    button.disabled = val;
+  });
+  userListEl.querySelectorAll("button, input[type='checkbox']").forEach(function(control) {
+    control.disabled = val;
+  });
 }
 
 function norm(v) {
@@ -821,6 +827,7 @@ function makeRoleCheck(label, checked, onChange) {
   const cb = document.createElement("input");
   cb.type = "checkbox";
   cb.checked = checked;
+  cb.disabled = state.busy;
   cb.addEventListener("change", function() { onChange(cb.checked); });
   wrap.appendChild(cb);
   wrap.appendChild(document.createTextNode(label));
