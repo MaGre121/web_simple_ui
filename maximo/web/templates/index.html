@@ -265,6 +265,15 @@
     tr:last-child td { border-bottom: none; }
     .cell-code { font-family: var(--mono); font-size: 12px; }
     .cell-muted { color: var(--muted); font-size: 12px; }
+    .scan-values { display: grid; gap: 6px; min-width: 220px; }
+    .scan-entry { display: grid; gap: 2px; }
+    .scan-label {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 700;
+    }
     .status-chip {
       display: inline-flex;
       align-items: center;
@@ -420,7 +429,7 @@
             <th>Template</th>
             <th>Projekt</th>
             <th>Location</th>
-            <th>Serialnr.</th>
+            <th>Scanwerte</th>
             <th>Status</th>
             <th>Ergebnis</th>
             <th></th>
@@ -834,6 +843,45 @@ function createCell(text, cls) {
   return td;
 }
 
+function createScanValuesCell(entry) {
+  const td = document.createElement("td");
+  const wrapper = document.createElement("div");
+  wrapper.className = "scan-values";
+
+  const serialEntry = document.createElement("div");
+  serialEntry.className = "scan-entry";
+  const serialLabel = document.createElement("div");
+  serialLabel.className = "scan-label";
+  serialLabel.textContent = "Serialnummer";
+  const serialValue = document.createElement("div");
+  serialValue.className = "cell-code";
+  serialValue.textContent = entry.serialnum || "-";
+  serialEntry.appendChild(serialLabel);
+  serialEntry.appendChild(serialValue);
+  wrapper.appendChild(serialEntry);
+
+  const userSpecs = entry && typeof entry.user_specs === "object" && entry.user_specs ? entry.user_specs : {};
+  Object.entries(userSpecs).forEach(function(pair) {
+    const specEntry = document.createElement("div");
+    specEntry.className = "scan-entry";
+
+    const specLabel = document.createElement("div");
+    specLabel.className = "scan-label";
+    specLabel.textContent = pair[0];
+
+    const specValue = document.createElement("div");
+    specValue.className = "cell-code";
+    specValue.textContent = pair[1] || "-";
+
+    specEntry.appendChild(specLabel);
+    specEntry.appendChild(specValue);
+    wrapper.appendChild(specEntry);
+  });
+
+  td.appendChild(wrapper);
+  return td;
+}
+
 /* ── queue render ── */
 function renderQueue() {
   queueBody.innerHTML = "";
@@ -874,7 +922,7 @@ function renderQueue() {
     row.appendChild(itemCell);
     row.appendChild(createCell(entry.projektcode || entry.projekt, "cell-code"));
     row.appendChild(createCell(entry.location, "cell-code"));
-    row.appendChild(createCell(entry.serialnum, "cell-code"));
+    row.appendChild(createScanValuesCell(entry));
     row.appendChild(statusCell);
     row.appendChild(resultCell);
     row.appendChild(actionCell);
