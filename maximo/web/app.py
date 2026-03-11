@@ -512,7 +512,7 @@ def fetch_data(request: Request, payload: dict | None = Body(default=None)):
     try:
         result = subprocess.run(
             cmd,
-            cwd=str(settings.BASE_DIR),
+            cwd=str(settings.BASE_DIR.parent),
             capture_output=True,
             text=True,
             timeout=600,

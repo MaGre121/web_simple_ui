@@ -552,8 +552,9 @@ async function readJson(res) {
 
 function apiError(data, fallback) {
   if (!data) return fallback;
-  if (data.detail) return data.detail;
+  if (data.detail && data.stderr) return data.detail + "\n" + data.stderr;
   if (data.stderr) return data.stderr;
+  if (data.detail) return data.detail;
   if (data.error) return data.error;
   return fallback;
 }
