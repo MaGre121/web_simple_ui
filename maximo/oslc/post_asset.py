@@ -1,5 +1,6 @@
 import base64
 import logging
+import time
 
 import requests
 
@@ -100,7 +101,7 @@ def _asset_href(server: str, assetnum: str, siteid: str) -> str:
     raw = f"{assetnum}/{siteid}"
     b64 = base64.b64encode(raw.encode()).decode().rstrip("=")
     b64 = b64.replace("+", "-").replace("/", "_")
-    return f"{server.rstrip('/')}/{OSLC_POST_ASSET_ENDPOINT}/_{b64}-"
+    return f"{server}{OSLC_POST_ASSET_ENDPOINT}/_{b64}-"
 
 
 def _decode_asset_href(resource_uri: str) -> tuple[str, str]:
@@ -158,14 +159,15 @@ def _update_specs(
 
     if not assetnum or not siteid:
         raise RuntimeError("Asset-URL fuer Spec-Update konnte nicht bestimmt werden")
-    url = _asset_href(server, assetnum, siteid)
+    url = _asset_href(server, assetnum, siteid) + "?lean=1"
 
     payload = {
-        "spi:assetspec": [
+        "assetnum": f"{assetnum}",
+        "assetspec": [
             {
-                "spi:assetattrid": spec["assetattrid"],
-                "spi:linearassetspecid": 0,
-                "spi:alnvalue": spec["alnvalue"],
+                "assetattrid": spec["assetattrid"],
+                "linearassetspecid": 0,
+                "alnvalue": spec["alnvalue"],
             }
             for spec in specs
         ]
@@ -203,7 +205,7 @@ def _update_specs(
     if response.status_code != 200:
         raise RuntimeError(
             f"Spec-Update fehlgeschlagen fuer {assetnum}: "
-            f"{response.status_code} {response.text[:500]}"
+            f"{response.status_code} {response.text}"
         )
 
 
@@ -274,6 +276,7 @@ def post_asset(server: str, session, entry: dict) -> dict:
     # Create the asset first, then merge specs so we do not replace existing rows.
     if specs and assetnum:
         try:
+            time.sleep(3)
             _update_specs(
                 server,
                 session,
