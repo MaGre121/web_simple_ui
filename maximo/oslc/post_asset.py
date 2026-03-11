@@ -19,6 +19,13 @@ def _should_skip_assetspec(attrid: str) -> bool:
     return _clean_text(attrid).upper() in SKIPPED_ASSETSPEC_IDS
 
 
+def _trim_text(value: str, limit: int = 1000) -> str:
+    text = _clean_text(value)
+    if len(text) <= limit:
+        return text
+    return f"{text[:limit]}..."
+
+
 def _build_create_payload(entry: dict) -> dict:
     payload = {}
 
@@ -164,12 +171,11 @@ def _update_specs(
     if not specs:
         return
 
-    if assetnum and siteid:
+    url = _normalize_resource_uri(server, asset_uri)
+    if not url and assetnum and siteid:
         url = _asset_href(server, assetnum, siteid)
-    else:
-        url = _normalize_resource_uri(server, asset_uri)
-        if not url:
-            raise RuntimeError("Asset-URL fuer Spec-Update konnte nicht bestimmt werden")
+    if not url:
+        raise RuntimeError("Asset-URL fuer Spec-Update konnte nicht bestimmt werden")
 
     payload = {
         "spi:assetspec": [
@@ -181,6 +187,14 @@ def _update_specs(
             for spec in specs
         ]
     }
+
+    logger.debug(
+        "Spec-Update request asset=%s site=%s url=%s payload=%s",
+        assetnum,
+        siteid,
+        url,
+        payload,
+    )
 
     response = session.post(
         url,
@@ -194,6 +208,14 @@ def _update_specs(
             "x-public-uri": server,
         },
         timeout=30,
+    )
+
+    logger.debug(
+        "Spec-Update response asset=%s status=%s headers=%s body=%s",
+        assetnum,
+        response.status_code,
+        dict(response.headers),
+        _trim_text(response.text),
     )
 
     if response.status_code != 200:
@@ -216,6 +238,13 @@ def post_asset(server: str, session, entry: dict) -> dict:
 
     url = f"{server}{OSLC_POST_ASSET_ENDPOINT}?lean=1"
 
+    logger.debug(
+        "Asset create request item=%s url=%s payload=%s",
+        entry.get("itemnum"),
+        url,
+        payload,
+    )
+
     try:
         response = session.post(
             url,
@@ -231,6 +260,14 @@ def post_asset(server: str, session, entry: dict) -> dict:
     except requests.RequestException as exc:
         logger.exception("Asset POST fehlgeschlagen item=%s", entry.get("itemnum"))
         return {"success": False, "error": str(exc)}
+
+    logger.debug(
+        "Asset create response item=%s status=%s headers=%s body=%s",
+        entry.get("itemnum"),
+        response.status_code,
+        dict(response.headers),
+        _trim_text(response.text),
+    )
 
     if not response.ok:
         error = _extract_error(response)
