@@ -313,7 +313,7 @@
         <div class="field">
           <label for="serverInput">Server</label>
           <input id="serverInput" type="text" autocomplete="off" spellcheck="false" placeholder="https://company.example">
-          <div class="field-hint">Wird aus `.env` geladen, kann aber direkt im UI geaendert werden.</div>
+          <div class="field-hint">Wird lokal im Browser gehalten und direkt an das Backend uebergeben.</div>
         </div>
         <div class="field">
           <label for="ltpaTokenInput">LtpaToken2</label>
@@ -441,6 +441,7 @@
 "use strict";
 
 const MAC_SPEC_IDS = new Set(["bam.macadresse"]);
+const SETTINGS_STORAGE_KEY = "maximo-web-settings-v1";
 
 /* ── state ── */
 const state = {
@@ -564,6 +565,22 @@ function connectionPayload() {
     server: serverInput.value.trim(),
     ltpa_token2: ltpaTokenInput.value.trim(),
   };
+}
+
+function loadStoredSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) || "{}");
+  } catch (err) {
+    return {};
+  }
+}
+
+function saveStoredSettings() {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(connectionPayload()));
+  } catch (err) {
+    // Browser storage is optional for this workflow.
+  }
 }
 
 /* ── label builders ── */
@@ -919,9 +936,33 @@ async function loadSettings() {
   const data = await readJson(res);
   if (!res.ok) throw new Error(apiError(data, "Verbindung konnte nicht geladen werden"));
 
-  serverInput.value = data.server || "";
-  ltpaTokenInput.value = data.ltpa_token2 || "";
+  if (data.server || data.ltpa_token2) {
+    serverInput.value = data.server || "";
+    ltpaTokenInput.value = data.ltpa_token2 || "";
+    saveStoredSettings();
+    renderConnectionStatus(data);
+    return data;
+  }
+
+  const stored = loadStoredSettings();
+  serverInput.value = stored.server || "";
+  ltpaTokenInput.value = stored.ltpa_token2 || "";
+  if (serverInput.value || ltpaTokenInput.value) {
+    renderConnectionStatus({
+      error: "Lokale Browserwerte geladen. Verbindung wird beim ersten Speichern oder 'Hole Daten' aktiviert.",
+      session_ready: false,
+    });
+    return {
+      server: serverInput.value,
+      ltpa_token2: ltpaTokenInput.value,
+      session_ready: false,
+      active_server: "",
+      error: "",
+    };
+  }
+
   renderConnectionStatus(data);
+  return data;
 }
 
 async function saveSettings() {
@@ -932,6 +973,7 @@ async function saveSettings() {
   });
   const data = await readJson(res);
   if (!res.ok) throw new Error(apiError(data, "Verbindung konnte nicht gespeichert werden"));
+  saveStoredSettings();
   renderConnectionStatus(data);
   return data;
 }
@@ -1157,7 +1199,10 @@ fetchDataButton.addEventListener("click", async function() {
 (async function init() {
   setBusy(true);
   try {
-    await loadSettings();
+    const settings = await loadSettings();
+    if (!settings.session_ready && serverInput.value.trim() && ltpaTokenInput.value.trim()) {
+      await saveSettings();
+    }
     await loadQueue();
     try {
       await loadData();

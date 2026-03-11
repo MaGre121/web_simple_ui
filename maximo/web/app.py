@@ -21,9 +21,6 @@ from maximo.normalization import (
 from maximo.oslc.post_asset import post_asset
 from maximo.oslc.session import (
     create_session,
-    load_environment,
-    read_environment,
-    save_environment,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,21 +39,23 @@ def _set_session_state(app: FastAPI, server: str, token: str) -> None:
         return
 
     app.state.server = cleaned_server
+    app.state.ltpa_token2 = cleaned_token
     app.state.session = create_session(cleaned_token)
     app.state.startup_error = None
     logger.info("Maximo-Session initialisiert fuer %s", cleaned_server)
 
 
-def _connection_payload(payload: dict | None = None) -> tuple[str, str]:
+def _connection_payload(app: FastAPI, payload: dict | None = None) -> tuple[str, str]:
     body = payload or {}
-    saved_server, saved_token = read_environment()
+    current_server = _clean_text(getattr(app.state, "server", ""))
+    current_token = _clean_text(getattr(app.state, "ltpa_token2", ""))
 
-    server = _clean_text(body.get("server")) or saved_server
+    server = _clean_text(body.get("server")) or current_server
     token = _clean_text(
         body.get("ltpa_token2")
         or body.get("LtpaToken2")
         or body.get("MAXIMO_LTPA_TOKEN2")
-    ) or saved_token
+    ) or current_token
 
     if not server or not token:
         raise HTTPException(
@@ -68,10 +67,9 @@ def _connection_payload(payload: dict | None = None) -> tuple[str, str]:
 
 
 def _connection_response(app: FastAPI) -> dict[str, Any]:
-    server, token = read_environment()
     return {
-        "server": server,
-        "ltpa_token2": token,
+        "server": _clean_text(getattr(app.state, "server", "")),
+        "ltpa_token2": _clean_text(getattr(app.state, "ltpa_token2", "")),
         "session_ready": bool(getattr(app.state, "server", None) and app.state.session),
         "active_server": _clean_text(getattr(app.state, "server", "")),
         "error": _clean_text(getattr(app.state, "startup_error", "")),
@@ -371,15 +369,9 @@ def _load_queue_or_http_error() -> list[dict]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.server = None
+    app.state.ltpa_token2 = None
     app.state.session = None
-    app.state.startup_error = None
-
-    try:
-        server, token = load_environment()
-        _set_session_state(app, server, token)
-    except Exception as exc:
-        app.state.startup_error = f"Session-Fehler: {exc}"
-        logger.error("Startup fehlgeschlagen: %s", exc)
+    app.state.startup_error = ""
 
     yield
 
@@ -399,8 +391,7 @@ def get_settings(request: Request):
 
 @app.post("/api/settings")
 def save_settings(request: Request, payload: dict = Body(...)):
-    server, token = _connection_payload(payload)
-    save_environment(server, token)
+    server, token = _connection_payload(request.app, payload)
     _set_session_state(request.app, server, token)
     return JSONResponse(_connection_response(request.app))
 
@@ -503,8 +494,7 @@ def upload_queue(request: Request):
 
 @app.post("/api/fetch-data")
 def fetch_data(request: Request, payload: dict | None = Body(default=None)):
-    server, token = _connection_payload(payload)
-    save_environment(server, token)
+    server, token = _connection_payload(request.app, payload)
     _set_session_state(request.app, server, token)
 
     cmd = [sys.executable, "-m", "maximo.main"]
@@ -512,6 +502,8 @@ def fetch_data(request: Request, payload: dict | None = Body(default=None)):
 
     try:
         env = os.environ.copy()
+        env["SERVER"] = server
+        env["MAXIMO_LTPA_TOKEN2"] = token
         env["PYTHONIOENCODING"] = "utf-8"
         env.setdefault("PYTHONUTF8", "1")
         result = subprocess.run(
