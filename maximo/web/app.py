@@ -127,9 +127,6 @@ def _normalize_specs(specs: Any, label: str) -> dict[str, str]:
                     detail=str(exc),
                 ) from exc
 
-        if label == "user_specs" and not cleaned_value:
-            continue
-
         normalized[cleaned_key] = cleaned_value
 
     return normalized

@@ -59,15 +59,18 @@ def _collect_specs(entry: dict) -> dict[str, str]:
         specs = entry.get(key)
         if not isinstance(specs, dict):
             continue
+        allow_empty_values = key == "user_specs"
 
         for attrid, value in specs.items():
             cleaned_attrid = _clean_text(attrid)
             cleaned_value = _clean_text(value)
 
-            if not cleaned_attrid or not cleaned_value:
+            if not cleaned_attrid:
                 continue
             if _is_mac_spec(cleaned_attrid):
                 cleaned_value = _normalize_mac_address(cleaned_value, cleaned_attrid)
+            if not cleaned_value and not allow_empty_values:
+                continue
 
             collected[cleaned_attrid] = cleaned_value
 

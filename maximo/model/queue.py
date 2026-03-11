@@ -37,7 +37,7 @@ def _normalize_queue_entry(entry):
         for key, value in user_specs.items():
             cleaned_key = _clean_text(key)
             cleaned_value = _clean_text(value)
-            if not cleaned_key or not cleaned_value:
+            if not cleaned_key:
                 continue
             cleaned_user_specs[cleaned_key] = cleaned_value
         normalized["user_specs"] = cleaned_user_specs

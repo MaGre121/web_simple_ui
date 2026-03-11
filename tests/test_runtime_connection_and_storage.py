@@ -61,7 +61,7 @@ class TestRuntimeStorage(RuntimeStorageTestCase):
             str(self.settings.CACHE_QUEUE_FILE).startswith(self.tempdir.name)
         )
 
-    def test_queue_omits_blank_user_specs_when_saving(self):
+    def test_queue_preserves_blank_user_specs_when_saving(self):
         stored_entry = self.queue.add_to_queue(
             {
                 "itemnum": "CISCO.CATALYST.9200L",
@@ -84,11 +84,17 @@ class TestRuntimeStorage(RuntimeStorageTestCase):
             }
         )
 
-        self.assertEqual(stored_entry["user_specs"], {"BAM.NOTIZ": "Rack 12"})
+        self.assertEqual(
+            stored_entry["user_specs"],
+            {"BAM.MACADRESSE": "", "BAM.NOTIZ": "Rack 12"},
+        )
 
         queue = self.queue.load_queue()
         self.assertEqual(len(queue), 1)
-        self.assertEqual(queue[0]["user_specs"], {"BAM.NOTIZ": "Rack 12"})
+        self.assertEqual(
+            queue[0]["user_specs"],
+            {"BAM.MACADRESSE": "", "BAM.NOTIZ": "Rack 12"},
+        )
 
     def test_queue_reuses_existing_id_when_entry_is_overwritten(self):
         original_entry = self.queue.add_to_queue(
@@ -212,7 +218,7 @@ class TestRuntimeConnectionAPI(RuntimeStorageTestCase):
         self.assertIn("https://company.example", config_text)
         self.assertNotIn("secret-token", config_text)
 
-    def test_queue_api_accepts_blank_user_specs_and_does_not_persist_them(self):
+    def test_queue_api_accepts_blank_user_specs_and_persists_them(self):
         with TestClient(self.web_app.app) as client:
             response = client.post(
                 "/api/queue",
@@ -237,7 +243,10 @@ class TestRuntimeConnectionAPI(RuntimeStorageTestCase):
         self.assertEqual(response.status_code, 201)
         data = response.json()
         self.assertEqual(len(data), 1)
-        self.assertEqual(data[0]["user_specs"], {"BAM.NOTIZ": "Rack 12"})
+        self.assertEqual(
+            data[0]["user_specs"],
+            {"BAM.MACADRESSE": "", "BAM.NOTIZ": "Rack 12"},
+        )
 
     def test_queue_api_delete_removes_existing_entry(self):
         with TestClient(self.web_app.app) as client:

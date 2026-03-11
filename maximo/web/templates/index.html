@@ -1212,9 +1212,7 @@ function collectEntry() {
       value = normalizeMac(value);
       if (el) el.value = value;
     }
-    if (value) {
-      userSpecs[specName] = value;
-    }
+    userSpecs[specName] = value;
   });
 
   const t = state.selectedTemplate;
