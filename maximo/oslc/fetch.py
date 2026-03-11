@@ -12,9 +12,9 @@ def fetch_all_oslc(server, session, endpoint, params, max_pages):
             timeout=30,
         )
 
-        print(f"➡️ Request Seite {page + 1}: {response.status_code}")
+        print(f"Request Seite {page + 1}: {response.status_code}")
         if "application/json" not in response.headers.get("Content-Type", ""):
-            raise RuntimeError("❌ Kein JSON – LTPA Token vermutlich abgelaufen")
+            raise RuntimeError("Kein JSON - LTPA Token vermutlich abgelaufen")
 
         data = response.json()
         members = data.get("rdfs:member", [])
@@ -31,4 +31,3 @@ def fetch_all_oslc(server, session, endpoint, params, max_pages):
         page += 1
 
     return all_members
-

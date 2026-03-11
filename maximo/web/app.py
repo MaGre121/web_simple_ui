@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import subprocess
 import sys
 from contextlib import asynccontextmanager
@@ -510,11 +511,17 @@ def fetch_data(request: Request, payload: dict | None = Body(default=None)):
     logger.info("Starte Datenabruf: %s", " ".join(cmd))
 
     try:
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+        env.setdefault("PYTHONUTF8", "1")
         result = subprocess.run(
             cmd,
             cwd=str(settings.BASE_DIR.parent),
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
             timeout=600,
         )
     except subprocess.TimeoutExpired as exc:
