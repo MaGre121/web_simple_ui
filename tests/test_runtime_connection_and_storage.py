@@ -186,6 +186,34 @@ class TestRuntimeConnectionAPI(RuntimeStorageTestCase):
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["user_specs"], {"BAM.NOTIZ": "Rack 12"})
 
+    def test_queue_api_delete_removes_existing_entry(self):
+        with TestClient(self.web_app.app) as client:
+            create_response = client.post(
+                "/api/queue",
+                json={
+                    "itemnum": "CISCO.CATALYST.9200L",
+                    "description": "Switch",
+                    "siteid": "BWS00001",
+                    "orgid": "BTRBZ",
+                    "location": "LOC-001",
+                    "serialnum": "SN-12345",
+                    "projekt": "PRJ-001",
+                    "cfglibgroup": "ConfigLibarianGroup",
+                    "fixed_specs": {"BAM.TYPENBEZEICHNUNG": "Cisco Catalyst 9200L"},
+                    "user_specs": {"BAM.NOTIZ": "Rack 12"},
+                    "users": [],
+                },
+            )
+
+            self.assertEqual(create_response.status_code, 201)
+            queue = create_response.json()
+            self.assertEqual(len(queue), 1)
+
+            delete_response = client.delete(f"/api/queue/{queue[0]['id']}")
+
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertEqual(delete_response.json(), [])
+
 
 if __name__ == "__main__":
     unittest.main()

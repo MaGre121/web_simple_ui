@@ -811,6 +811,7 @@ function renderUserList() {
     removeBtn.className = "danger-button";
     removeBtn.type = "button";
     removeBtn.textContent = "Entfernen";
+    removeBtn.disabled = state.busy;
     removeBtn.addEventListener("click", function() {
       state.assignedUsers.splice(idx, 1);
       renderUserList();
@@ -923,7 +924,19 @@ function renderQueue() {
     delBtn.type = "button";
     delBtn.textContent = "Delete";
     delBtn.disabled = state.busy;
-    delBtn.addEventListener("click", function() { deleteQueueEntry(entry.id); });
+    delBtn.addEventListener("click", async function() {
+      if (state.busy) return;
+      setBusy(true);
+      showMessage("");
+      try {
+        await deleteQueueEntry(entry.id);
+        showMessage("Queue-Eintrag geloescht.", "ok");
+      } catch (err) {
+        showMessage(err.message, "error");
+      } finally {
+        setBusy(false);
+      }
+    });
     actionCell.appendChild(delBtn);
 
     row.appendChild(itemCell);
