@@ -12,11 +12,6 @@ from maximo.normalization import (
 )
 
 logger = logging.getLogger(__name__)
-SKIPPED_ASSETSPEC_IDS = {"BAM.TYPENBEZEICHNUNG"}
-
-
-def _should_skip_assetspec(attrid: str) -> bool:
-    return _clean_text(attrid).upper() in SKIPPED_ASSETSPEC_IDS
 
 
 def _trim_text(value: str, limit: int = 1000) -> str:
@@ -72,8 +67,6 @@ def _collect_specs(entry: dict) -> dict[str, str]:
 
             if not cleaned_attrid or not cleaned_value:
                 continue
-            if _should_skip_assetspec(cleaned_attrid):
-                continue
             if _is_mac_spec(cleaned_attrid):
                 cleaned_value = _normalize_mac_address(cleaned_value, cleaned_attrid)
 
@@ -83,13 +76,25 @@ def _collect_specs(entry: dict) -> dict[str, str]:
 
 
 def _build_spec_payload(entry: dict) -> list[dict]:
+    collected = _collect_specs(entry)
     specs = []
-    for attrid, value in _collect_specs(entry).items():
-        row = {
-            "assetattrid": attrid,
-            "alnvalue": value,
-        }
-        specs.append(row)
+
+    typenbezeichnung = collected.pop("BAM.TYPENBEZEICHNUNG", "")
+    if typenbezeichnung:
+        specs.append(
+            {
+                "assetattrid": "BAM.TYPENBEZEICHNUNG",
+                "alnvalue": typenbezeichnung,
+            }
+        )
+
+    for attrid, value in collected.items():
+        specs.append(
+            {
+                "assetattrid": attrid,
+                "alnvalue": value,
+            }
+        )
 
     return specs
 
@@ -189,7 +194,6 @@ def _update_specs(
             "Content-Type": "application/json",
             "Accept": "application/json",
             "x-method-override": "PATCH",
-            "PATCHTYPE": "MERGE",
             "properties": "assetspec",
             "x-public-uri": server,
         },
