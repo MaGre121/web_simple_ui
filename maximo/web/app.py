@@ -166,6 +166,7 @@ def _validate_entry(payload: dict) -> dict:
     projektcode = _pick_text(payload, "projektcode", "projekt", "cxprojekt", "cxprojektid")
 
     entry = {
+        "id": _clean_text(payload.get("id")),
         "itemnum": _clean_text(payload.get("itemnum")),
         "description": _clean_text(payload.get("description")),
         "siteid": _clean_text(payload.get("siteid")),
@@ -206,6 +207,9 @@ def _validate_entry(payload: dict) -> dict:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Nur ein User darf isprimary=true haben.",
         )
+
+    if not entry["id"]:
+        entry.pop("id", None)
 
     return entry
 

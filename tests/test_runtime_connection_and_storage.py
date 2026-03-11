@@ -90,6 +90,59 @@ class TestRuntimeStorage(RuntimeStorageTestCase):
         self.assertEqual(len(queue), 1)
         self.assertEqual(queue[0]["user_specs"], {"BAM.NOTIZ": "Rack 12"})
 
+    def test_queue_reuses_existing_id_when_entry_is_overwritten(self):
+        original_entry = self.queue.add_to_queue(
+            {
+                "itemnum": "CISCO.CATALYST.9200L",
+                "description": "Switch",
+                "siteid": "BWS00001",
+                "orgid": "BTRBZ",
+                "location": "LOC-001",
+                "serialnum": "SN-12345",
+                "projekt": "PRJ-001",
+                "cxprojekt": "PRJ-001",
+                "projektcode": "PRJ-001",
+                "cfglibgroup": "ConfigLibarianGroup",
+                "fixed_specs": {"BAM.TYPENBEZEICHNUNG": "Cisco Catalyst 9200L"},
+                "user_specs": {"BAM.NOTIZ": "Rack 12"},
+                "users": [],
+            }
+        )
+
+        overwritten_entry = self.queue.add_to_queue(
+            {
+                "id": original_entry["id"],
+                "itemnum": "CISCO.CATALYST.9200L",
+                "description": "Switch",
+                "siteid": "BWS00001",
+                "orgid": "BTRBZ",
+                "location": "LOC-001",
+                "serialnum": "SN-99999",
+                "projekt": "PRJ-001",
+                "cxprojekt": "PRJ-001",
+                "projektcode": "PRJ-001",
+                "cfglibgroup": "ConfigLibarianGroup",
+                "fixed_specs": {"BAM.TYPENBEZEICHNUNG": "Cisco Catalyst 9200L"},
+                "user_specs": {"BAM.NOTIZ": "Rack 42"},
+                "users": [],
+                "status": "error",
+                "assetnum": "ASSET-1",
+                "error": "bad scan",
+            }
+        )
+
+        self.assertEqual(overwritten_entry["id"], original_entry["id"])
+        self.assertEqual(overwritten_entry["status"], "pending")
+        self.assertNotIn("assetnum", overwritten_entry)
+        self.assertNotIn("error", overwritten_entry)
+
+        queue = self.queue.load_queue()
+        self.assertEqual(len(queue), 1)
+        self.assertEqual(queue[0]["id"], original_entry["id"])
+        self.assertEqual(queue[0]["serialnum"], "SN-99999")
+        self.assertEqual(queue[0]["user_specs"], {"BAM.NOTIZ": "Rack 42"})
+        self.assertEqual(queue[0]["status"], "pending")
+
 
 @unittest.skipUnless(TestClient is not None, "fastapi is not installed in this test environment")
 class TestRuntimeConnectionAPI(RuntimeStorageTestCase):
@@ -213,6 +266,60 @@ class TestRuntimeConnectionAPI(RuntimeStorageTestCase):
 
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(delete_response.json(), [])
+
+    def test_queue_api_overwrites_existing_entry_when_id_is_reused(self):
+        with TestClient(self.web_app.app) as client:
+            create_response = client.post(
+                "/api/queue",
+                json={
+                    "itemnum": "CISCO.CATALYST.9200L",
+                    "description": "Switch",
+                    "siteid": "BWS00001",
+                    "orgid": "BTRBZ",
+                    "location": "LOC-001",
+                    "serialnum": "SN-12345",
+                    "projekt": "PRJ-001",
+                    "cfglibgroup": "ConfigLibarianGroup",
+                    "fixed_specs": {"BAM.TYPENBEZEICHNUNG": "Cisco Catalyst 9200L"},
+                    "user_specs": {"BAM.NOTIZ": "Rack 12"},
+                    "users": [],
+                },
+            )
+
+            self.assertEqual(create_response.status_code, 201)
+            original_queue = create_response.json()
+            self.assertEqual(len(original_queue), 1)
+
+            update_response = client.post(
+                "/api/queue",
+                json={
+                    "id": original_queue[0]["id"],
+                    "itemnum": "CISCO.CATALYST.9200L",
+                    "description": "Switch",
+                    "siteid": "BWS00001",
+                    "orgid": "BTRBZ",
+                    "location": "LOC-001",
+                    "serialnum": "SN-99999",
+                    "projekt": "PRJ-001",
+                    "cfglibgroup": "ConfigLibarianGroup",
+                    "fixed_specs": {"BAM.TYPENBEZEICHNUNG": "Cisco Catalyst 9200L"},
+                    "user_specs": {"BAM.NOTIZ": "Rack 42"},
+                    "users": [],
+                    "status": "error",
+                    "assetnum": "ASSET-1",
+                    "error": "bad scan",
+                },
+            )
+
+        self.assertEqual(update_response.status_code, 201)
+        updated_queue = update_response.json()
+        self.assertEqual(len(updated_queue), 1)
+        self.assertEqual(updated_queue[0]["id"], original_queue[0]["id"])
+        self.assertEqual(updated_queue[0]["serialnum"], "SN-99999")
+        self.assertEqual(updated_queue[0]["user_specs"], {"BAM.NOTIZ": "Rack 42"})
+        self.assertEqual(updated_queue[0]["status"], "pending")
+        self.assertNotIn("assetnum", updated_queue[0])
+        self.assertNotIn("error", updated_queue[0])
 
 
 if __name__ == "__main__":

@@ -263,6 +263,9 @@
     th { padding: 10px 12px; text-align: left; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
     td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
     tr:last-child td { border-bottom: none; }
+    .queue-row { cursor: pointer; }
+    .queue-row:hover td { background: rgba(23,32,51,0.04); }
+    .queue-row.editing td { background: rgba(184,92,56,0.12); }
     .cell-code { font-family: var(--mono); font-size: 12px; }
     .cell-muted { color: var(--muted); font-size: 12px; }
     .scan-values { display: grid; gap: 6px; min-width: 220px; }
@@ -461,6 +464,7 @@ const state = {
   assignedUsers: [],   // [{ personid, isprimary, isuser, iscustodian }]
   queue: [],
   busy: false,
+  editingQueueId: null,
 };
 
 /* ── DOM refs ── */
@@ -602,18 +606,26 @@ function buildUserLabel(u) {
   return u ? u.personid : "";
 }
 
+function updateAddButtonLabel() {
+  addButton.textContent = state.editingQueueId ? "Queue-Eintrag speichern" : "Zur Queue";
+}
+
 /* ── finders ── */
 function findTemplate(raw) {
   const v = norm(raw);
   return state.templates.find(function(t) {
-    return norm(buildTemplateLabel(t)) === v || norm(t.itemnum) === v;
+    return norm(buildTemplateLabel(t)) === v || norm(t.itemnum) === v || norm(t.description) === v;
   }) || null;
 }
 
 function findProject(raw) {
   const v = norm(raw);
   return state.projects.find(function(p) {
-    return norm(buildProjectLabel(p)) === v || norm(p.projektcode) === v;
+    return (
+      norm(buildProjectLabel(p)) === v ||
+      norm(p.projektcode) === v ||
+      norm(p.cxprojektid) === v
+    );
   }) || null;
 }
 
@@ -629,6 +641,103 @@ function findUser(raw) {
   return state.users.find(function(u) {
     return norm(buildUserLabel(u)) === v || norm(u.personid) === v;
   }) || null;
+}
+
+function cloneAssignedUsers(users) {
+  if (!Array.isArray(users)) return [];
+  return users
+    .filter(function(u) { return u && u.personid; })
+    .map(function(u) {
+      return {
+        personid: String(u.personid).trim(),
+        isprimary: Boolean(u.isprimary),
+        isuser: Boolean(u.isuser),
+        iscustodian: Boolean(u.iscustodian),
+      };
+    });
+}
+
+function clearEditMode() {
+  state.editingQueueId = null;
+  updateAddButtonLabel();
+  renderQueue();
+}
+
+function findTemplateByEntry(entry) {
+  const candidates = [
+    entry.itemnum,
+    buildTemplateLabel({ itemnum: entry.itemnum, description: entry.description }),
+    entry.description,
+  ].map(norm).filter(Boolean);
+
+  return state.templates.find(function(template) {
+    return (
+      candidates.includes(norm(template.itemnum)) ||
+      candidates.includes(norm(buildTemplateLabel(template))) ||
+      candidates.includes(norm(template.description))
+    );
+  }) || null;
+}
+
+function findProjectByEntry(entry) {
+  const candidates = [
+    entry.projektcode,
+    entry.projekt,
+    entry.cxprojekt,
+    entry.cxprojektid,
+  ].map(norm).filter(Boolean);
+
+  return state.projects.find(function(project) {
+    return (
+      candidates.includes(norm(project.projektcode)) ||
+      candidates.includes(norm(project.cxprojektid)) ||
+      candidates.includes(norm(buildProjectLabel(project)))
+    );
+  }) || null;
+}
+
+function populateFormFromQueueEntry(entry) {
+  const template = findTemplateByEntry(entry);
+  if (!template) {
+    throw new Error(
+      "Template fuer Queue-Eintrag nicht im Cache gefunden. Bitte Daten aktualisieren oder Eintrag loeschen."
+    );
+  }
+
+  state.editingQueueId = entry.id || null;
+  updateAddButtonLabel();
+
+  state.selectedTemplate = template;
+  templateInput.value = buildTemplateLabel(template);
+  renderTemplateMeta();
+
+  const project = findProjectByEntry(entry);
+  projectInput.value = project
+    ? buildProjectLabel(project)
+    : (entry.projektcode || entry.projekt || entry.cxprojekt || entry.cxprojektid || "");
+
+  const location = findLocation(entry.location);
+  locationInput.value = location ? buildLocationLabel(location) : (entry.location || "");
+  cfglibgroupInput.value = entry.cfglibgroup || "";
+  state.assignedUsers = cloneAssignedUsers(entry.users);
+  renderUserList();
+
+  const serialEl = assetForm.elements["serialnum"];
+  if (serialEl) {
+    serialEl.value = entry.serialnum || "";
+  }
+
+  const userSpecs = entry && typeof entry.user_specs === "object" && entry.user_specs ? entry.user_specs : {};
+  const specs = Array.isArray(template.user_specs) ? template.user_specs : [];
+  specs.forEach(function(specName) {
+    const input = assetForm.elements["spec__" + specName];
+    if (input) {
+      input.value = userSpecs[specName] || "";
+    }
+  });
+
+  renderQueue();
+  focusPrimaryField();
 }
 
 /* ── datalist populators ── */
@@ -905,6 +1014,22 @@ function renderQueue() {
 
   q.forEach(function(entry) {
     const row = document.createElement("tr");
+    row.className = "queue-row" + (state.editingQueueId === entry.id ? " editing" : "");
+    row.tabIndex = state.busy ? -1 : 0;
+    row.addEventListener("click", function() {
+      if (state.busy) return;
+      try {
+        populateFormFromQueueEntry(entry);
+        showMessage("Queue-Eintrag geladen. Werte anpassen und erneut speichern.", "info");
+      } catch (err) {
+        showMessage(err.message, "error");
+      }
+    });
+    row.addEventListener("keydown", function(event) {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      row.click();
+    });
 
     const itemCell = document.createElement("td");
     const itemTitle = document.createElement("div"); itemTitle.className = "cell-code"; itemTitle.textContent = entry.itemnum || "-";
@@ -924,7 +1049,8 @@ function renderQueue() {
     delBtn.type = "button";
     delBtn.textContent = "Delete";
     delBtn.disabled = state.busy;
-    delBtn.addEventListener("click", async function() {
+    delBtn.addEventListener("click", async function(event) {
+      event.stopPropagation();
       if (state.busy) return;
       setBusy(true);
       showMessage("");
@@ -982,6 +1108,10 @@ async function loadQueue() {
   const res = await fetch("/api/queue");
   if (!res.ok) return;
   state.queue = await res.json();
+  if (state.editingQueueId && !state.queue.some(function(entry) { return entry.id === state.editingQueueId; })) {
+    state.editingQueueId = null;
+    updateAddButtonLabel();
+  }
   renderQueue();
 }
 
@@ -1032,7 +1162,7 @@ async function addToQueue(entry) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || "Fehler beim Hinzufuegen");
   state.queue = data;
-  renderQueue();
+  clearEditMode();
 }
 
 async function deleteQueueEntry(id) {
@@ -1040,6 +1170,10 @@ async function deleteQueueEntry(id) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || "Loeschen fehlgeschlagen");
   state.queue = data;
+  if (state.editingQueueId === id) {
+    clearEditMode();
+    return;
+  }
   renderQueue();
 }
 
@@ -1088,6 +1222,7 @@ function collectEntry() {
   const l = location;
 
   return {
+    id:               state.editingQueueId || undefined,
     itemnum:          t.itemnum,
     description:      t.description,
     siteid:           l.siteid || t.siteid,
@@ -1168,9 +1303,10 @@ assetForm.addEventListener("submit", async function(e) {
   try { entry = collectEntry(); } catch (err) { showMessage(err.message, "error"); return; }
   setBusy(true);
   try {
+    const wasEditing = Boolean(state.editingQueueId);
     await addToQueue(entry);
     clearVolatileFields();
-    showMessage("Asset zur Queue hinzugefuegt.", "ok");
+    showMessage(wasEditing ? "Queue-Eintrag aktualisiert." : "Asset zur Queue hinzugefuegt.", "ok");
     focusPrimaryField();
   } catch (err) {
     showMessage(err.message, "error");
@@ -1181,6 +1317,7 @@ assetForm.addEventListener("submit", async function(e) {
 
 clearButton.addEventListener("click", function() {
   clearVolatileFields();
+  clearEditMode();
   showMessage("");
 });
 
@@ -1232,6 +1369,7 @@ fetchDataButton.addEventListener("click", async function() {
 
 /* ── init ── */
 (async function init() {
+  updateAddButtonLabel();
   setBusy(true);
   try {
     await loadSettings();

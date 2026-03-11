@@ -72,11 +72,23 @@ def save_queue(queue: list[dict]) -> None:
 def add_to_queue(entry: dict) -> dict:
     # Keep the caller's dict untouched before queue metadata is added.
     stored_entry = _normalize_queue_entry(entry)
-    stored_entry["id"] = str(uuid4())
+    stored_entry["id"] = _clean_text(stored_entry.get("id")) or str(uuid4())
     stored_entry["status"] = "pending"
+    stored_entry.pop("assetnum", None)
+    stored_entry.pop("error", None)
 
     queue = load_queue()
-    queue.append(stored_entry)
+    existing_index = next(
+        (
+            index for index, queued_entry in enumerate(queue)
+            if queued_entry.get("id") == stored_entry["id"]
+        ),
+        None,
+    )
+    if existing_index is None:
+        queue.append(stored_entry)
+    else:
+        queue[existing_index] = stored_entry
     save_queue(queue)
 
     return stored_entry
