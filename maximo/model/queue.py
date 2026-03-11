@@ -3,6 +3,7 @@ from copy import deepcopy
 from uuid import uuid4
 
 from maximo.config.settings import CACHE_DIR, CACHE_QUEUE_FILE
+from maximo.normalization import pick_text as _pick_text
 
 
 def _ensure_queue_file() -> None:
@@ -18,6 +19,16 @@ def _normalize_queue_entry(entry):
 
     normalized = deepcopy(entry)
     normalized.pop("classstructureid", None)
+    normalized["cfglibgroup"] = _pick_text(
+        normalized,
+        "cfglibgroup",
+        "group",
+        "cxpersongroup",
+        "persongroup",
+    )
+    normalized.pop("group", None)
+    normalized.pop("cxpersongroup", None)
+    normalized.pop("persongroup", None)
     return normalized
 
 

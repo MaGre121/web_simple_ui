@@ -94,7 +94,13 @@ def _validate_entry(payload: dict) -> dict:
         "cxprojekt": projekt,
         "projektcode": projektcode,
         "cxprojektid": _pick_text(payload, "cxprojektid"),
-        "group": _pick_text(payload, "group", "cxpersongroup", "persongroup"),
+        "cfglibgroup": _pick_text(
+            payload,
+            "cfglibgroup",
+            "group",
+            "cxpersongroup",
+            "persongroup",
+        ),
         "users": _normalize_users(
             payload.get("users")
             if payload.get("users") is not None

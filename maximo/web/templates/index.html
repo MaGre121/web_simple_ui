@@ -331,6 +331,12 @@
           <datalist id="locationOptions"></datalist>
         </div>
 
+        <div class="field">
+          <label for="cfglibgroupInput">CfgLibGroup</label>
+          <input id="cfglibgroupInput" type="text" autocomplete="off" spellcheck="false" placeholder="CfgLibGroup ...">
+          <div class="field-hint">Persistenter Wert fuer cxpersongroup beim Create.</div>
+        </div>
+
         <!-- Users -->
         <div class="field">
           <label>Benutzer / Custodians</label>
@@ -419,6 +425,7 @@ const projectInput    = document.getElementById("projectSearch");
 const projectOptions  = document.getElementById("projectOptions");
 const locationInput   = document.getElementById("locationSearch");
 const locationOptions = document.getElementById("locationOptions");
+const cfglibgroupInput = document.getElementById("cfglibgroupInput");
 const userSearch      = document.getElementById("userSearch");
 const userOptions     = document.getElementById("userOptions");
 const addUserButton   = document.getElementById("addUserButton");
@@ -889,6 +896,7 @@ function collectEntry() {
     cxprojekt:        p.projektcode || p.cxprojektid || "",
     projektcode:      p.projektcode,
     cxprojektid:      p.cxprojektid || "",
+    cfglibgroup:      cfglibgroupInput.value.trim(),
     location:         l.location,
     serialnum:        serialnum,
     users:            state.assignedUsers.map(function(u) {

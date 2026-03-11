@@ -22,7 +22,13 @@ def _build_create_payload(entry: dict) -> dict:
         if value:
             payload[field] = value
 
-    persongroup = _pick_text(entry, "group", "cxpersongroup", "persongroup")
+    persongroup = _pick_text(
+        entry,
+        "cfglibgroup",
+        "group",
+        "cxpersongroup",
+        "persongroup",
+    )
     if persongroup:
         payload["cxpersongroup"] = persongroup
 
@@ -101,7 +107,7 @@ def _asset_href(server: str, assetnum: str, siteid: str) -> str:
     raw = f"{assetnum}/{siteid}"
     b64 = base64.b64encode(raw.encode()).decode().rstrip("=")
     b64 = b64.replace("+", "-").replace("/", "_")
-    return f"{server}{OSLC_POST_ASSET_ENDPOINT}/_{b64}-"
+    return f"{server.rstrip('/')}/{OSLC_POST_ASSET_ENDPOINT}/_{b64}-"
 
 
 def _decode_asset_href(resource_uri: str) -> tuple[str, str]:
@@ -159,7 +165,7 @@ def _update_specs(
 
     if not assetnum or not siteid:
         raise RuntimeError("Asset-URL fuer Spec-Update konnte nicht bestimmt werden")
-    url = _asset_href(server, assetnum, siteid) + "?lean=1"
+    url = _asset_href(server, assetnum, siteid)
 
     payload = {
         "assetnum": f"{assetnum}",
